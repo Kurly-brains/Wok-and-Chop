@@ -197,7 +197,12 @@
   align-items: center;
   justify-content: space-between;
   gap: 8px;
+  flex-wrap: wrap;
   margin-top: 10px;
+}
+.bag-dialog .wc-bag-line-links {
+  display: flex;
+  gap: 6px;
 }
 .bag-dialog .wc-bag-quantity {
   display: flex;
@@ -228,7 +233,7 @@
   font-weight: 650;
   font-variant-numeric: tabular-nums;
 }
-.bag-dialog .wc-bag-remove {
+.bag-dialog :is(.wc-bag-remove, .wc-bag-edit) {
   min-height: 44px;
   padding: 0 2px;
   border: 0;
@@ -237,6 +242,11 @@
   font-size: 11px;
   text-decoration: underline;
   text-underline-offset: 3px;
+}
+.bag-dialog .wc-bag-edit {
+  min-width: 44px;
+  color: var(--red);
+  font-weight: 650;
 }
 .bag-dialog .wc-bag-remove:hover {
   color: var(--red);

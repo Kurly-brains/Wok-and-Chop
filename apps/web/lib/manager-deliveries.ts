@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 import { API_URL, refreshCustomer } from "./customer-session";
+import type { DeliveryStatus, DeliveryStatusEvent } from "./delivery";
 
-export type DeliveryStatus = "RECEIVED" | "PREPARING" | "OUT_FOR_DELIVERY" | "DELIVERED" | "CANCELLED";
+export type { DeliveryStatus } from "./delivery";
 export type ManagerDelivery = {
   id: string;
   number: string;
@@ -11,6 +12,7 @@ export type ManagerDelivery = {
   version: number;
   createdAt: string;
   updatedAt: string;
+  statusHistory?: DeliveryStatusEvent[];
   name: string;
   phone: string;
   address: { street: string; unit: string; city: string; province: string; postalCode: string };

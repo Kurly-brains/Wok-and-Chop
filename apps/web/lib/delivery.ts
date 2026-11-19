@@ -7,13 +7,24 @@ export const deliveryStages = [
   { id: "DELIVERED", label: "Delivered" },
 ] as const;
 
+export type DeliveryStatus = (typeof deliveryStages)[number]["id"] | "CANCELLED";
+export type DeliveryStatusEvent = { status: DeliveryStatus; at: string };
+export const deliveryEventTime = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Toronto",
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
+
 export type Delivery = {
   id: string;
   number: string;
-  status: (typeof deliveryStages)[number]["id"] | "CANCELLED";
+  status: DeliveryStatus;
   version: number;
   createdAt: string;
   updatedAt: string;
+  statusHistory?: DeliveryStatusEvent[];
   items: {
     name: string;
     quantity: number;

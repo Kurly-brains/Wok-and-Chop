@@ -4,12 +4,13 @@ import Link from "next/link";
 import type { ReactNode } from "react";
 import "../../styles/operations-shell.css";
 
-type Workspace = "staff" | "kitchen" | "menu" | "customers" | "printer";
+type Workspace = "staff" | "kitchen" | "menu" | "customers" | "reports" | "printer";
 export function OperationsShell({ active, training = false, children }: { active: Workspace; training?: boolean; children: ReactNode }) {
   const links: { key: Workspace; href: string; label: string }[] = [
     { key: "staff", href: "/staff/", label: "Delivery desk" },
     { key: "kitchen", href: "/kitchen/", label: "Kitchen" },
     { key: "customers", href: "/staff/customers/", label: "Customers" },
+    { key: "reports", href: "/staff/reports/", label: "Reports" },
     { key: "menu", href: "/staff/menu/", label: "Menu editor" },
     { key: "printer", href: "/staff/printer-guide/", label: "Printer setup" },
   ];

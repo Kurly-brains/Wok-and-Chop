@@ -1,12 +1,15 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { API_URL, authRequest, useCustomer } from "../lib/customer-session";
+import { ManagerSignIn } from "./operations/ManagerSignIn";
 import { OperationsShell } from "./operations/OperationsShell";
 import { formatMoney, isLunchMenuItem, lunchCategories } from "@wok/domain";
 import {
   getMenuCatalogSnapshot,
-  resetCatalog,
-  saveMenuItem,
+  publishMenuItem,
+  refreshPublishedMenu,
+  resetPublishedMenu,
   useMenuCatalog,
   type MenuCatalogItem,
 } from "../lib/menu-catalog";
@@ -130,6 +133,7 @@ function DishEditor({
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [uploading, setUploading] = useState(false);
+  const [saving, setSaving] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
   const uploadSequence = useRef(0);
   const uploadInput = useRef<HTMLInputElement>(null);
@@ -178,19 +182,21 @@ function DishEditor({
       if (uploadInput.current) uploadInput.current.value = "";
     }
   }
-  function save(event: React.FormEvent<HTMLFormElement>) {
+  async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    if (saving) return;
     setError("");
     setNotice("");
+    setSaving(true);
     try {
       const current = getMenuCatalogSnapshot().find(
         (dish) => dish.id === item.id,
       );
       if (!current || snapshot(current) !== baseSnapshot)
         throw new Error(
-          "This dish changed in another tab. Reload its details before saving to avoid overwriting that change.",
+          "The published dish changed. Reload its details before saving.",
         );
-      const saved = saveMenuItem(item.id, {
+      const saved = await publishMenuItem(item.id, {
         name: draft.name.trim(),
         description: draft.description.trim(),
         categoryId: draft.categoryId,
@@ -205,16 +211,14 @@ function DishEditor({
       setBaseSnapshot(snapshot(saved));
       onDirty(false);
       onSaved();
-      setNotice(
-        "Saved in this browser. The lunch menu now uses these details.",
-      );
+      setNotice("Published. The lunch menu now uses these details.");
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
           : "Changes could not be saved. Your edits are still here.",
       );
-    }
+    } finally { setSaving(false); }
   }
   let priceLabel = "Enter a price";
   try {
@@ -230,12 +234,12 @@ function DishEditor({
           <h2>{draft.name || "Untitled dish"}</h2>
         </div>
         <span className="menu-editor-save-state">
-          {dirty ? "Unsaved changes" : "Saved locally"}
+          {dirty ? "Unsaved changes" : "Published"}
         </span>
       </div>
       {changedElsewhere && (
         <div className="menu-editor-conflict" role="status">
-          <p>This dish changed in another tab. Reload before saving.</p>
+          <p>The published dish changed. Reload before saving.</p>
           <button type="button" onClick={onReload}>
             Reload details
           </button>
@@ -304,7 +308,7 @@ function DishEditor({
               />
               <span>
                 <strong>Available on the lunch menu</strong>
-                <small>Uncheck to show this dish as sold out.</small>
+                <small>Uncheck to hide this dish from the customer menu.</small>
               </span>
             </label>
             <div className="menu-editor-dietary-fields">
@@ -494,9 +498,6 @@ function DishEditor({
               </span>
               <strong>{priceLabel}</strong>
             </div>
-            <p className="menu-editor-preview-note">
-              Preview only. No image is uploaded to a server.
-            </p>
           </aside>
         </div>
         {error && (
@@ -512,24 +513,24 @@ function DishEditor({
         <div className="menu-editor-save-bar">
           <p>
             {dirty
-              ? "Ready when you are. Save to update this browser’s menu."
-              : "Your changes stay on this device."}
+              ? "Publish to update the lunch menu and delivery quotes."
+              : "The customer menu uses these details."}
           </p>
           <div>
             <button
               type="button"
               className="menu-editor-secondary"
               onClick={onReload}
-              disabled={uploading || !dirty}
+              disabled={uploading || saving || !dirty}
             >
               Discard changes
             </button>
             <button
               type="submit"
               className="menu-editor-primary"
-              disabled={uploading || !dirty || changedElsewhere}
+              disabled={uploading || saving || !dirty || changedElsewhere}
             >
-              {uploading ? "Reading image…" : "Save changes"}
+              {uploading ? "Reading image…" : saving ? "Publishing…" : "Publish changes"}
               <span aria-hidden="true">↗</span>
             </button>
           </div>
@@ -539,7 +540,7 @@ function DishEditor({
   );
 }
 
-export default function MenuEditor() {
+function MenuEditorWorkspace() {
   const catalog = useMenuCatalog().filter(isLunchMenuItem);
   const [selectedId, setSelectedId] = useState(catalog[0]?.id ?? "");
   const [search, setSearch] = useState("");
@@ -548,6 +549,7 @@ export default function MenuEditor() {
   const [revision, setRevision] = useState(0);
   const [notice, setNotice] = useState("");
   const [resetOpen, setResetOpen] = useState(false);
+  const [resetting, setResetting] = useState(false);
   const resetHeading = useRef<HTMLHeadingElement>(null);
   const selected = catalog.find((item) => item.id === selectedId) ?? catalog[0];
   const matches = catalog.filter(
@@ -565,39 +567,36 @@ export default function MenuEditor() {
     setRevision((value) => value + 1);
     setNotice("");
   }
-  function reset() {
+  async function reset() {
+    if (resetting) return;
+    setResetting(true);
     try {
-      resetCatalog();
+      await resetPublishedMenu();
       reload();
       setResetOpen(false);
-      setNotice("Original menu data restored in this browser.");
+      setNotice("The original lunch menu was restored.");
     } catch (err) {
       setNotice(
         err instanceof Error
           ? err.message
           : "The original menu could not be restored.",
       );
-    }
+    } finally { setResetting(false); }
   }
   return (
-    <OperationsShell active="menu">
       <div className="menu-workspace">
         <main id="main-content" tabIndex={-1} className="menu-editor-main">
         <div className="menu-editor-heading">
           <div>
-            <p>Restaurant workspace / Local catalogue</p>
+            <p>Restaurant workspace / Lunch</p>
             <h1>Lunch menu editor</h1>
             <span>
-              Edit dish details, prices and menu photography in this browser.
+              Publish dish details, prices and menu photography to the lunch menu.
             </span>
           </div>
           <div className="menu-editor-scope">
-            <strong>Browser preview</strong>
-            <p>
-              Menu from your supplied artwork.
-              <br />
-              No restaurant publishing connection.
-            </p>
+            <strong>Local preview</strong>
+            <p>Updates apply to the menu and unpaid delivery quotes.</p>
           </div>
         </div>
         <div className="menu-editor-layout">
@@ -696,9 +695,7 @@ export default function MenuEditor() {
                 Restore the original menu data?
               </h2>
               <p>
-                This removes this browser’s menu edits and uploaded dish images,
-                including changes outside the lunch menu. Other browser data
-                stays as it is.
+                This restores all lunch dishes, prices and photos to their original values.
               </p>
             </div>
             <div>
@@ -706,6 +703,7 @@ export default function MenuEditor() {
                 type="button"
                 className="menu-editor-secondary"
                 onClick={() => setResetOpen(false)}
+                disabled={resetting}
               >
                 Keep my edits
               </button>
@@ -713,22 +711,57 @@ export default function MenuEditor() {
                 type="button"
                 className="menu-editor-primary"
                 onClick={reset}
+                disabled={resetting}
               >
-                Restore original
+                {resetting ? "Restoring…" : "Restore original"}
               </button>
             </div>
           </section>
         )}
-        <footer className="menu-editor-footer">
-          <p>
-            This development authoring tool has no administrator sign-in or
-            production publishing. Uploaded images are stored only in this
-            browser.
-          </p>
-          <span>Wok &amp; Chop · Kanata</span>
-        </footer>
         </main>
       </div>
-    </OperationsShell>
   );
+}
+
+function MenuEditorAccess() {
+  const [access, setAccess] = useState("loading");
+  const [retry, setRetry] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    async function load() {
+      try {
+        const response = await fetch(`${API_URL}/v1/auth/admin/menu`, {
+          credentials: "include", cache: "no-store", signal: controller.signal,
+        });
+        const next = response.status === 403 || response.status === 401 ? "denied"
+          : response.ok && await refreshPublishedMenu() ? "ready" : "unavailable";
+        if (!controller.signal.aborted) setAccess(next);
+      } catch {
+        if (!controller.signal.aborted) setAccess("unavailable");
+      }
+    }
+    void load();
+    return () => controller.abort();
+  }, [retry]);
+
+  if (access === "ready") return <MenuEditorWorkspace />;
+  return <main id="main-content" className="ops-main" tabIndex={-1}>
+    <h1>Lunch menu editor</h1>
+    {access === "loading" ? <p role="status">Checking menu access…</p>
+      : access === "denied" ? <p role="alert">Sign in with a restaurant manager account to publish changes.</p>
+      : <p role="alert">The menu service is temporarily unavailable.</p>}
+    {access === "denied" && <button className="ops-button" onClick={() => void authRequest("logout").catch(() => setAccess("unavailable"))}>Sign out</button>}
+    {access === "unavailable" && <button className="ops-button" onClick={() => { setAccess("loading"); setRetry(value => value + 1); }}>Retry</button>}
+  </main>;
+}
+
+export default function MenuEditor() {
+  const user = useCustomer();
+  return <OperationsShell active="menu">
+    {user ? <MenuEditorAccess key={user.id} /> :
+      <main id="main-content" className="ops-main" tabIndex={-1}>
+        <h1>Lunch menu editor</h1>
+        <ManagerSignIn description="Sign in to update dishes, prices and photos." />
+      </main>}
+  </OperationsShell>;
 }

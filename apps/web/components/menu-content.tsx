@@ -4,13 +4,13 @@ import { useState } from "react";
 import InkInscription from "./ink-inscription";
 import {
   formatMoney,
-  isLunchMenuItem,
   lunchCategories,
   lunchMenuDetails,
   type MenuItem,
   type PricedLine,
 } from "@wok/domain";
 import { useRequestedCategory } from "../lib/use-requested-category";
+import { searchLunchMenu } from "../lib/menu-search";
 import "../styles/menu.css";
 
 type Props = {
@@ -40,13 +40,14 @@ function DishCard({
 }) {
   const [failedImage, setFailedImage] = useState<string | null>(null);
   const hasImage = Boolean(item.image && failedImage !== item.image);
-  const soldOut = item.available === false;
   const category = lunchCategories.find(
     (entry) => entry.id === item.categoryId,
   );
   const styles = item.modifierGroups?.find(
     (group) => group.id === "lunch-style",
   );
+  const preparations = item.modifierGroups?.find((group) => group.id === "lunch-preparation")
+    ?.options.filter((option) => option.available !== false);
   return (
     <article
       className={`menu-dish-card${quantity > 0 ? " is-added" : ""}`}
@@ -56,7 +57,6 @@ function DishCard({
       <button
         className={`menu-dish-photo is-${item.imagePresentation ?? "photo"}`}
         onClick={() => onChoose(item)}
-        disabled={soldOut}
         aria-label={`View ${item.name} and options`}
       >
         {hasImage ? (
@@ -104,7 +104,6 @@ function DishCard({
             {quantity} in your bag
           </span>
         )}
-        {soldOut && <span className="menu-dish-sold-out">Sold out</span>}
       </button>
       <div className="menu-dish-copy">
         <h2 id={`dish-title-${item.id}`}>{item.name}</h2>
@@ -120,6 +119,9 @@ function DishCard({
             </span>
           ) : null}
           {item.containsPeanuts && <span>Contains peanuts</span>}
+          {preparations?.length ? (
+            <span>{preparations.map((option) => option.name).join(" / ")}</span>
+          ) : null}
           {styles && (
             <span>
               {styles.options
@@ -133,11 +135,10 @@ function DishCard({
           <strong>{formatMoney(item.priceCents)}</strong>
           <button
             onClick={() => onChoose(item)}
-            disabled={soldOut}
             aria-label={`Add ${item.name} to bag`}
           >
-            {soldOut ? "Sold out" : quantity > 0 ? "Add more" : "Add"}
-            {!soldOut && <span aria-hidden="true">+</span>}
+            {quantity > 0 ? "Add more" : "Add"}
+            <span aria-hidden="true">+</span>
           </button>
         </div>
       </div>
@@ -157,17 +158,7 @@ export default function MenuContent({
   const [query, setQuery] = useState("");
   const requestedActive = legacyCategories[requested] ?? requested;
   const active = selected ?? requestedActive;
-  const lunches = items.filter(isLunchMenuItem);
-  const visible = lunches
-    .filter(
-      (item) =>
-        (active === "all" || item.categoryId === active) &&
-        item.name.toLowerCase().includes(query.toLowerCase().trim()),
-    )
-    .sort(
-      (left, right) =>
-        Number(Boolean(right.image)) - Number(Boolean(left.image)),
-    );
+  const visible = searchLunchMenu(items, active, query);
   const count = lines.reduce((sum, line) => sum + line.quantity, 0);
   const quantities = new Map<string, number>();
   for (const line of lines) {
@@ -244,19 +235,20 @@ export default function MenuContent({
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Find your favourite"
+              placeholder="Search dishes, spice or ingredients"
               aria-label="Search lunch menu"
+              aria-controls="menu-search-results"
             />
           </label>
           <p className="menu-result-count" aria-live="polite">
-            {visible.length} dishes · CAD
+            {visible.length} {visible.length === 1 ? "dish" : "dishes"} · CAD
           </p>
           <button className="menu-bag-summary" onClick={onBag}>
             Your bag ({count}) <strong>{formatMoney(subtotal)}</strong>
             <span aria-hidden="true">↗</span>
           </button>
         </div>
-        <div className="menu-dish-grid">
+        <div className="menu-dish-grid" id="menu-search-results">
           {visible.map((item) => (
             <DishCard
               key={item.id}
@@ -269,7 +261,7 @@ export default function MenuContent({
         {visible.length === 0 && (
           <div className="menu-grid-empty" role="status">
             <h2>No dishes found.</h2>
-            <p>Try another name or browse the full menu.</p>
+            <p>Try a dish, an ingredient or a word like “spicy”.</p>
             <button
               onClick={() => {
                 setQuery("");

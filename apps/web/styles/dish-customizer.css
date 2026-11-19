@@ -118,6 +118,26 @@ dialog.item-dialog {
   border-color: var(--red-line);
   color: var(--red-dark);
 }
+.item-dialog .spice-options label:has(input:disabled) {
+  opacity: 0.6;
+  cursor: default;
+}
+.item-dialog .remember-dish-options {
+  display: flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 8px;
+  margin-top: 9px;
+  color: #3f342e;
+  font-size: 12px;
+  cursor: pointer;
+}
+.item-dialog .remember-dish-options input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--red);
+}
 .item-dialog .spice-options input {
   width: 16px;
   height: 16px;

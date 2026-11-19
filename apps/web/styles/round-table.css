@@ -60,26 +60,6 @@
   top: 66%;
 }
 
-.hero-headline-chopsticks {
-  position: absolute;
-  z-index: 3;
-  top: clamp(74px, 6.5vw, 106px);
-  width: auto;
-  height: clamp(170px, 20vw, 330px);
-  pointer-events: none;
-  filter: drop-shadow(0 4px 6px rgb(92 15 5 / 24%));
-}
-
-.hero-headline-chopsticks--left {
-  left: max(8%, calc(50% - 492px));
-  rotate: 19deg;
-}
-
-.hero-headline-chopsticks--right {
-  right: max(8%, calc(50% - 492px));
-  rotate: -19deg;
-}
-
 @media (max-width: 960px) {
   .layer-hero.has-round-table {
     display: flex;
@@ -107,16 +87,6 @@
   }
   .has-round-table .hero-halal {
     display: none;
-  }
-  .hero-headline-chopsticks {
-    top: 69px;
-    height: clamp(56px, 16vw, 150px);
-  }
-  .hero-headline-chopsticks--left {
-    left: 8%;
-  }
-  .hero-headline-chopsticks--right {
-    right: 8%;
   }
 }
 

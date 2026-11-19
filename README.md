@@ -1,6 +1,6 @@
 # Wok & Chop
 
-A Chinese restaurant website for Wok & Chop, with the original red homepage hero and food categories, an owner-supplied lunch menu, separate story and visit pages, local customer accounts, and staff/kitchen previews. The agreed homepage addition is a separate lower section of draggable Chinese-food story cards. A browser-local menu editor controls lunch prices, ordinary food photos and transparent cutouts. The restaurant address supplied in the brief is **790 Kanata Ave, Unit M2A, Kanata ON**. Currency is CAD; restaurant business time is `America/Toronto`.
+A Chinese restaurant website for Wok & Chop, with a rotating tabletop hero, an owner-supplied lunch menu, separate story and visit pages, and PostgreSQL-backed local delivery and restaurant workspaces. The restaurant address is **790 Kanata Ave, Unit M2A, Kanata ON**. Currency is CAD. Restaurant business time is `America/Toronto`.
 
 **Current status: design preview and engineering foundation.** The 37 lunch dishes, their $13.99 CAD base prices and stated lunch terms come from the owner's supplied menu. Generated imagery, demo promo codes and operational orders remain demonstration content; nine older sample dishes are retained internally for saved-cart compatibility. Customer accounts can persist in a real local PostgreSQL database when the account service is running. The application does not accept real orders, charges, refunds or kitchen print jobs.
 
@@ -25,6 +25,8 @@ Set-Location -LiteralPath 'E:\WOK & CHOP\wok-and-chop'
 
 This requires the PostgreSQL 18 tools at `C:\Program Files\PostgreSQL\18\bin`. The script creates its own cluster under `ops/.local/postgres` on loopback port 55440, applies the account migration, builds the API and starts it at `http://127.0.0.1:4000`. It does not alter an existing system database service. Generated credentials and database files remain in ignored local state. The browser API base defaults to that address; `NEXT_PUBLIC_API_BASE_URL` is available for an explicitly configured development setup.
 
+If port 3000 is in use, start the web app with `pnpm --filter @wok/web dev --port 3001` and the API with `& .\ops\start-local-accounts.ps1 -WebPort 3001`.
+
 Stop the foreground web/API processes with Ctrl+C. The task-owned database remains available for the next preview; see [local account startup and shutdown](docs/LOCAL-ACCOUNTS.md) for the exact database stop command, API contracts and security boundaries. Guest browsing and cart building do not require an account.
 
 ## Pages and interactions
@@ -39,7 +41,8 @@ Stop the foreground web/API processes with Ctrl+C. The task-owned database remai
 | `/account/`    | Account sign-in and linked delivery and pickup receipts                                 |
 | `/staff/`      | Manager sign-in, delivery desk, order history, and kitchen and driver slips             |
 | `/staff/customers/` | Manager-only customer directory and individual order lookup                         |
-| `/staff/menu/` | Local editor for lunch details, prices, availability and photo/cutout images            |
+| `/staff/reports/` | Manager-only delivery volumes, dishes, timing and promotional activity                |
+| `/staff/menu/` | Manager menu publishing for lunch details, prices, availability and photo/cutout images |
 | `/kitchen/`    | Manager kitchen display for preparation and driver handoff                             |
 | `/staff/printer-guide/` | Printer setup, virtual spool test, and physical test instructions                |
 | `/staff/training/` | Separate sample order board and virtual printer diagnostics                           |
@@ -47,15 +50,17 @@ Stop the foreground web/API processes with Ctrl+C. The task-owned database remai
 
 The local home delivery flow stores test orders and their status changes in PostgreSQL. Guests receive a private tracking code. Before live operation, configure the approved service area, delivery charges, tax, payments and driver handoff. [Local delivery guide](docs/LOCAL-DELIVERY.md)
 
+The [ordering feature checklist](docs/ORDERING-FEATURES.md) records which restaurant workflows are available in the local preview and what each remaining launch feature requires.
+
 The demo codes are `WOK10` (10% off food with a $20 minimum, capped at $15) and `DEMO5` ($5 off food with a $35 minimum). Apply one at a time. The API recalculates each code against the server catalog for local test orders.
 
-The original homepage hero and category composition remain intact, with the supplied brand red (`#c90109`), pure-white (`#ffffff`) site surfaces and tighter section spacing. The supplied box logo appears before scrolling, the horizontal logo after scrolling, and the supplied favicon identifies the site. “Chinese roots. Hakka soul.” is a compact text-only introduction. A separate full-viewport section contains four standalone Chinese-food stories in an infinitely looping, freely draggable track with partial neighbouring cards and navigation controls, without a position indicator or progress bar. The editorial cards have no prices, lunch labels or order buttons and remain independent of menu editing. Completed browser, branding and build checks are recorded in [UI acceptance notes](docs/UI-ACCEPTANCE.md).
+The red homepage hero (`#c90109`) layers a rotating tabletop and overhead dishes in front of the headline. The box logo appears before scrolling, the horizontal logo after scrolling, and the supplied favicon identifies the site. Four food stories run in a freely draggable carousel with neighbouring cards and arrow controls. Completed browser, branding and build checks are recorded in [UI acceptance notes](docs/UI-ACCEPTANCE.md).
 
 The Menu page has a full-width food-photo banner, outlined category filters and a dish-photo grid: four columns on desktop and two on mobile. Its 37 lunch entries cover Chicken (15), Beef (10), Fish (6), Vegetarian (4), and Rice & noodles (2). The supplied offer is noon–3 p.m., excluding holidays, with jasmine rice, a vegetable spring roll, and soup of the day or pop. Fried-rice substitution adds $2.50; dry preparation adds $1.00 for the applicable categories. See [the lunch source and presentation brief](docs/LUNCH-MENU.md) for the exact data and editing boundaries.
 
 Dish cards support ordinary photos and transparent cutouts, with useful text when no photo is assigned. After adding a dish, its card shows a deep-red highlight, checkmark and the actual quantity in the bag; this state clears when that quantity returns to zero. Dish option selectors remain in the choose-dish modal. Required choices, current prices and bag state remain independent of the visual redesign.
 
-At `/staff/menu/`, choose a lunch dish, edit its price/details, select photo or cutout presentation, and save. The file picker accepts JPEG, PNG and WebP files up to 350 KB; stored image data URLs are capped at 500,000 bytes and the complete catalog override at 2,500,000 bytes. Changes persist only in this browser's local storage and synchronize with tabs on the same origin. The lunch menu and bag revalidate against the edited catalog. Reset restores the imported lunch defaults and legacy sample defaults. No image is sent to a server, and these edits do not publish a restaurant menu or create protected staff access. Customer sign-in does not change this local authoring boundary.
+With the local API running, sign in to `/staff/menu/` as a restaurant manager to publish lunch text, price, visibility and photo/cutout changes. The customer menu and server delivery quotes use the published PostgreSQL catalog. Reset restores the imported lunch defaults. Apply the local menu migration through the startup script before using the editor.
 
 ## Checks and builds
 
@@ -71,7 +76,7 @@ pnpm lint
 pnpm build
 ```
 
-Generate Next.js route types before a standalone typecheck on a fresh checkout. `pnpm test` currently runs 33 domain/lunch/promotion/catalog/cart tests. API integration tests run eight HTTP/configuration checks without a database; two account tests are explicitly skipped unless `AUTH_TEST_DATABASE_URL` is set. To include the local account tests in the same PowerShell session:
+Generate Next.js route types before a standalone typecheck on a fresh checkout. The domain suite covers lunch data, search, pricing, promotions, menu and cart behavior. API integration tests marked as PostgreSQL-backed run when `AUTH_TEST_DATABASE_URL` is set. To include them in the same PowerShell session:
 
 ```powershell
 . .\ops\start-local-accounts.ps1 -DatabaseOnly

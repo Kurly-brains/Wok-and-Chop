@@ -24,8 +24,8 @@ The earlier proposal to drive the homepage from featured lunch dishes is superse
 
 ## Local editing and launch boundary
 
-`/staff/menu/` authors the lunch menu's prices, details and images. Edits use versioned browser-local storage and synchronize between tabs on the same origin. Photos are not uploaded to a server, and changes are not published to other devices or visitors. The local account service does not grant staff authorization. Generated food assets remain concept imagery rather than photographs of the restaurant's actual dishes.
+`/staff/menu/` lets local restaurant managers publish lunch prices, details, availability and images to PostgreSQL. The public catalog and server quote use published changes, and previously accepted delivery snapshots retain their original prices and selections. Generated food imagery is illustrative.
 
-Imported lunch rows retain `fixture: true` as a **live-ordering safety gate**, despite their names and starting prices coming from the owner. This prevents source-menu entry from being mistaken for approved production payment/tax/fulfillment configuration. Checkout remains disabled. Menu operating details, taxes, reservations, staff authorization, persistent server catalog, payments and printer qualification still need their separate acceptance work.
+Imported lunch rows retain `fixture: true` for live-ordering eligibility. The local preview accepts unpaid delivery requests. Production menu operating details, taxes, reservations, payments and printer qualification require separate acceptance.
 
 The 28-test domain/lunch/promotion/catalog suite passed after the import, including all 37 items/category counts, required options and upgrade arithmetic, source terms, explicit markers, live-pricing rejection, local overrides and legacy compatibility. These results do not establish browser layout or production launch acceptance.

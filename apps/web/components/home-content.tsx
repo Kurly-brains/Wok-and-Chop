@@ -54,22 +54,6 @@ export default function HomeContent() {
           <span>Flavorful.</span>
           <strong>100% Halal.</strong>
         </div>
-        <img
-          className="hero-headline-chopsticks hero-headline-chopsticks--left"
-          src="/images/chopsticks-cutout.webp"
-          width={118}
-          height={1100}
-          alt=""
-          aria-hidden="true"
-        />
-        <img
-          className="hero-headline-chopsticks hero-headline-chopsticks--right"
-          src="/images/chopsticks-cutout.webp"
-          width={118}
-          height={1100}
-          alt=""
-          aria-hidden="true"
-        />
       </section>
       <section className="food-showcase" aria-labelledby="showcase-title">
         <div className="showcase-heading">

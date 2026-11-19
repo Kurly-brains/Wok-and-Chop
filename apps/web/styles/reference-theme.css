@@ -737,11 +737,15 @@
     gap: 16px;
   }
   .account-link {
-    font-size: 11px;
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+    font-size: 13px;
   }
   .bag-button {
     border: 1px solid #cbbab0;
     padding: 9px 12px;
+    min-height: 44px;
   }
   .bag-button > svg {
     width: 16px;
@@ -756,17 +760,19 @@
   .mobile-nav {
     background: var(--red);
     color: var(--paper);
-    display: flex;
-    justify-content: flex-end;
-    align-items: center;
-    gap: 17px;
-    padding: 14px 20px 14px 130px;
-    min-height: 48px;
-    font-size: 10px;
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    justify-items: stretch;
+    padding: 12px 12px 0;
+    font-size: 13px;
     white-space: nowrap;
     border-bottom: 1px solid rgb(255 255 255 / 25%);
   }
   .mobile-nav a {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    min-height: 44px;
     text-decoration: none;
   }
   .mobile-nav a[aria-current="page"] {
@@ -907,17 +913,25 @@
   }
   .footer-top > p {
     margin: 0;
-    font-size: 10px;
+    font-size: 12px;
     text-align: right;
     flex: 1;
   }
   .footer-page-links {
     grid-template-columns: 1fr;
-    font-size: 11px;
-    gap: 8px;
+    font-size: 13px;
+    gap: 0 16px;
+  }
+  .footer-page-links a,
+  .footer-bottom a {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
   }
   .footer-bottom {
-    font-size: 9px;
+    font-size: 11px;
+    align-items: center;
+    gap: 0 12px;
   }
   .account-section {
     display: block;
@@ -954,11 +968,17 @@
     gap: 25px;
   }
 }
-@media (max-width: 370px) {
-  .mobile-nav {
-    gap: 12px;
-    padding-right: 14px;
+@media (max-width: 460px) {
+  .site-footer .footer-page-links {
+    grid-template-columns: 1fr 1fr;
+    width: 100%;
   }
+  .site-footer .footer-top > p {
+    flex-basis: 100%;
+    text-align: left;
+  }
+}
+@media (max-width: 370px) {
   .site-header .wordmark {
     left: 14px;
   }

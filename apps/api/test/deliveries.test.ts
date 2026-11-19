@@ -180,6 +180,25 @@ test(
         mine.deliveries.map((order: { id: string }) => order.id),
         [own.delivery.id],
       );
+      const reorderPath = `deliveries/${own.delivery.id}/reorder`;
+      const reorder = await get(reorderPath, owner.cookie);
+      assert.equal(reorder.status, 200);
+      assert.equal(reorder.headers.get("cache-control"), "no-store");
+      assert.deepEqual(await reorder.json(), {
+        accountId: owner.user.id,
+        selections: lines.map(({ itemId, quantity, modifierIds }) => ({
+          itemId,
+          quantity,
+          modifierIds: [...modifierIds].sort(),
+        })),
+        unavailable: 0,
+      });
+      assert.equal((await get(reorderPath)).status, 401);
+      assert.equal((await get(reorderPath, manager.cookie)).status, 404);
+      assert.equal(
+        (await get(`deliveries/${first.delivery.id}/reorder`, owner.cookie)).status,
+        404,
+      );
       assert.equal((await get("deliveries/mine")).status, 401);
       assert.deepEqual(
         (await (await get("deliveries/mine", manager.cookie)).json())
@@ -192,10 +211,12 @@ test(
       });
       assert.equal(track.status, 200);
       assert.equal(track.headers.get("cache-control"), "no-store");
-      assert.equal(
-        JSON.stringify(await track.json()).includes("Synthetic"),
-        false,
-      );
+      const tracked = (await track.json()).delivery;
+      assert.equal(JSON.stringify(tracked).includes("Synthetic"), false);
+      assert.equal(tracked.statusHistory.length, 1);
+      assert.deepEqual(Object.keys(tracked.statusHistory[0]).sort(), ["at", "status"]);
+      assert.equal(tracked.statusHistory[0].status, "RECEIVED");
+      assert.equal(Date.parse(tracked.statusHistory[0].at), Date.parse(tracked.createdAt));
       assert.equal(
         (
           await post("deliveries/track", {
@@ -216,6 +237,9 @@ test(
       );
       assert.equal((await get("admin/deliveries")).status, 401);
       assert.equal((await get("admin/deliveries", owner.cookie)).status, 403);
+      assert.equal((await get("admin/delivery-reports")).status, 401);
+      assert.equal((await get("admin/delivery-reports", owner.cookie)).status, 403);
+      assert.equal((await get("admin/delivery-reports?days=60", manager.cookie)).status, 400);
       const managerList = await (
         await get("admin/deliveries?scope=active", manager.cookie)
       ).json();
@@ -258,6 +282,14 @@ test(
         ),
       ]);
       assert.deepEqual(race.map((r) => r.status).sort(), [200, 409]);
+      const preparing = await (
+        await post("deliveries/track", { trackingToken: first.trackingToken })
+      ).json();
+      assert.deepEqual(
+        preparing.delivery.statusHistory.map(({ status, at }: { status: string; at: string }) => [status, Number.isFinite(Date.parse(at))]),
+        [["RECEIVED", true], ["PREPARING", true]],
+      );
+      assert.ok(!JSON.stringify(preparing).includes(manager.user.id));
       assert.equal(
         (
           await post(
@@ -278,6 +310,20 @@ test(
         ).status,
         200,
       );
+      const reportResponse = await get("admin/delivery-reports?days=30", manager.cookie);
+      assert.equal(reportResponse.status, 200);
+      assert.equal(reportResponse.headers.get("cache-control"), "no-store");
+      const report = await reportResponse.json();
+      assert.match(report.startDate, /^\d{4}-\d{2}-\d{2}$/);
+      assert.ok(report.requests >= 2);
+      assert.ok(report.delivered >= 1);
+      assert.ok(report.foodTotalCents >= 2698);
+      assert.ok(report.dishes.some((dish: { name: string; quantity: number }) => dish.name === "Chilli Chicken" && dish.quantity >= 2));
+      assert.ok(report.promos.some((promo: { code: string; discountCents: number }) => promo.code === "WOK10" && promo.discountCents >= 300));
+      assert.ok(report.hours.length);
+      assert.ok(Number.isFinite(report.prepMinutes));
+      assert.ok(Number.isFinite(report.deliveryMinutes));
+      assert.doesNotMatch(JSON.stringify(report), /Synthetic|trackingToken|Test Lane/);
       const latest = (
         await (
           await post("deliveries/track", { trackingToken: first.trackingToken })

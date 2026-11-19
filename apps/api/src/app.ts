@@ -1,12 +1,16 @@
 import "reflect-metadata";
 import { randomUUID } from "node:crypto";
+import type { IncomingMessage } from "node:http";
 import { Controller, Get, HttpException, HttpStatus, Module, Post } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
+import type { NestExpressApplication } from "@nestjs/platform-express";
 import { getReadiness } from "./readiness";
 import { AuthController, AuthService } from "./auth";
 import { CustomerDirectoryController } from "./customer-directory";
 import { DeliveryController, ManagerDeliveryController } from "./deliveries";
+import { DeliveryReportsController } from "./delivery-reports";
 import { PrinterDiagnosticsController, PRINT_WEB_ORIGIN } from "./printer-diagnostics";
+import { PublishedMenuController } from "./published-menu";
 import { TrainingBoard, TrainingController } from "./training-board";
 
 function unavailable(message: string): never {
@@ -65,9 +69,9 @@ export async function createApplication(options: { authDatabaseUrl?: string; web
     throw new Error("The local preview API cannot run in production.");
   }
   const webOrigin = options.webOrigin ?? "http://127.0.0.1:3000";
-  const app = await NestFactory.create({
+  const app = await NestFactory.create<NestExpressApplication>({
     module: AppModule,
-    controllers: [FoundationController, AuthController, CustomerDirectoryController, DeliveryController, ManagerDeliveryController, PrinterDiagnosticsController, TrainingController],
+    controllers: [FoundationController, AuthController, CustomerDirectoryController, DeliveryController, ManagerDeliveryController, DeliveryReportsController, PrinterDiagnosticsController, PublishedMenuController, TrainingController],
     providers: [
       { provide: TrainingBoard, useFactory: () => new TrainingBoard(webOrigin, options.trainingDatabasePath ?? process.env.TRAINING_DATABASE_PATH) },
       { provide: AuthService, useFactory: () => new AuthService(options.authDatabaseUrl, webOrigin) },
@@ -90,6 +94,15 @@ export async function createApplication(options: { authDatabaseUrl?: string; web
     }
     next();
   });
+  // The menu editor accepts base64 photos. Keep the standard JSON limit on other routes.
+  app.useBodyParser("json", {
+    limit: "650kb",
+    type: (request: IncomingMessage) =>
+      request.method === "POST" &&
+      /^\/v1\/auth\/admin\/menu\/items\/[^/?]+\/?(?:\?|$)/.test(request.url ?? "") &&
+      /^application\/json\s*(?:;|$)/i.test(request.headers["content-type"] ?? ""),
+  });
+  app.useBodyParser("json");
   app.enableCors({ origin: webOrigin, credentials: true, methods: ["GET", "POST", "OPTIONS"], allowedHeaders: ["Content-Type"] });
   app.getHttpAdapter().getInstance().disable("x-powered-by");
   app.enableShutdownHooks();

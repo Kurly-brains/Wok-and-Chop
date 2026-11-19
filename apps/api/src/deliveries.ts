@@ -16,6 +16,7 @@ import {
 } from "@nestjs/common";
 import type { Pool } from "pg";
 import { AuthService } from "./auth";
+import { publishedPricingCatalog } from "./published-menu";
 import {
   confirmedSnapshot,
   fields,
@@ -24,6 +25,7 @@ import {
   postalPrefixes,
   prepareQuote,
   quoteInput,
+  reorderSelections,
   trackingFormat,
   uuid,
 } from "./delivery-input";
@@ -39,6 +41,7 @@ const transitions = {
   CANCELLED: [],
 } as const;
 type Status = keyof typeof transitions;
+type StatusEvent = { status: Status; at: string };
 type Row = {
   id: string;
   order_number: string;
@@ -48,7 +51,12 @@ type Row = {
   updated_at: Date;
   snapshot: Snapshot;
   request_fingerprint: string;
+  status_history?: StatusEvent[];
 };
+const statusHistory = `(
+  SELECT COALESCE(jsonb_agg(jsonb_build_object('status', e.status, 'at', e.created_at) ORDER BY e.version), '[]'::jsonb)
+  FROM delivery_order_events e WHERE e.order_id=d.id
+) AS status_history`;
 function items(lines: Snapshot["lines"]) {
   return lines.map((line) => ({
     name: line.name,
@@ -73,6 +81,7 @@ function customerView(row: Row) {
     version: row.version,
     createdAt: row.created_at,
     updatedAt: row.updated_at,
+    statusHistory: row.status_history,
     items: items(lines),
     subtotalCents,
     discountCents,
@@ -106,7 +115,7 @@ export async function deliveryPage(
   if (after !== undefined && (typeof after !== "string" || !uuid.test(after)))
     throw new BadRequestException("Invalid delivery list cursor.");
   const result = await db.query<Row>(
-    `SELECT d.* FROM delivery_orders d WHERE ($1::uuid IS NULL OR d.customer_account_id=$1)
+    `SELECT d.*, ${statusHistory} FROM delivery_orders d WHERE ($1::uuid IS NULL OR d.customer_account_id=$1)
     AND ($2::uuid IS NULL OR d.order_number < (SELECT c.order_number FROM delivery_orders c WHERE c.id=$2 AND ($1::uuid IS NULL OR c.customer_account_id=$1)))
     AND ($3::text='mine' OR ($3='history') = (d.status IN ('DELIVERED','CANCELLED')))
     ORDER BY d.order_number DESC LIMIT 26`,
@@ -137,9 +146,10 @@ export class DeliveryController {
   }
   @Post("quote")
   @HttpCode(200)
-  quote(@Body() body: unknown, @Req() request: Request) {
+  async quote(@Body() body: unknown, @Req() request: Request) {
     this.auth.checkOrigin(request);
-    const quote = prepareQuote(quoteInput(body));
+    const selection = quoteInput(body);
+    const quote = prepareQuote(selection, await publishedPricingCatalog(this.auth.database()));
     return {
       ...quote.totals,
       items: items(quote.lines),
@@ -180,10 +190,18 @@ export class DeliveryController {
       [requestHash],
     );
     if (existing.rows[0]) return replay(existing.rows[0]);
-    const snapshot = confirmedSnapshot(input);
     const client = await db.connect();
     try {
       await client.query("BEGIN");
+      // Serialise menu publication against the final price and availability check.
+      await client.query("SELECT version FROM shared_preview_menu WHERE singleton FOR SHARE");
+      const committed = await client.query<Row>("SELECT * FROM delivery_orders WHERE request_hash=$1", [requestHash]);
+      if (committed.rows[0]) {
+        const receipt = replay(committed.rows[0]);
+        await client.query("COMMIT");
+        return receipt;
+      }
+      const snapshot = confirmedSnapshot(input, await publishedPricingCatalog(client));
       const result = await client.query<Row>(
         `INSERT INTO delivery_orders(customer_account_id,request_hash,request_fingerprint,tracking_hash,snapshot)
         VALUES($1,$2,$3,$4,$5) ON CONFLICT(request_hash) DO NOTHING RETURNING *`,
@@ -234,7 +252,7 @@ export class DeliveryController {
       );
     const { rows } = await this.auth
       .database()
-      .query<Row>("SELECT * FROM delivery_orders WHERE tracking_hash=$1", [
+      .query<Row>(`SELECT d.*, ${statusHistory} FROM delivery_orders d WHERE d.tracking_hash=$1`, [
         hash(trackingToken),
       ]);
     if (
@@ -257,6 +275,24 @@ export class DeliveryController {
       throw new UnauthorizedException("Sign in to view your deliveries.");
     const orders = await deliveryPage(this.auth.database(), after, user.id, "mine");
     return { accountId: user.id, ...orders };
+  }
+
+  @Get(":id/reorder")
+  async reorder(
+    @Param("id") id: string,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    const { user } = await this.auth.me(request, response);
+    if (!user)
+      throw new UnauthorizedException("Sign in to reorder a delivery.");
+    if (!uuid.test(id)) throw new NotFoundException("Delivery not found.");
+    const { rows } = await this.auth.database().query<Pick<Row, "snapshot">>(
+      "SELECT snapshot FROM delivery_orders WHERE id=$1 AND customer_account_id=$2",
+      [id, user.id],
+    );
+    if (!rows[0]) throw new NotFoundException("Delivery not found.");
+    return { accountId: user.id, ...reorderSelections(rows[0].snapshot.lines, await publishedPricingCatalog(this.auth.database())) };
   }
 }
 

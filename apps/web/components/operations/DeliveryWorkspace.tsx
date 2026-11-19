@@ -16,9 +16,17 @@ import "../../styles/delivery-operations.css";
 type Screen = "staff" | "kitchen";
 const activeStages = ["RECEIVED", "PREPARING", "OUT_FOR_DELIVERY"] as const;
 const kitchenNames = { RECEIVED: "Incoming", PREPARING: "Preparing", OUT_FOR_DELIVERY: "With driver" };
+const kitchenTiming = { RECEIVED: "Waiting", PREPARING: "In preparation", OUT_FOR_DELIVERY: "With driver" };
 function stamp(iso: string) {
   const date = new Date(iso);
   return restaurantDate.format(date) + " · " + restaurantClock.format(date);
+}
+
+function elapsed(start: string, checked: Date) {
+  const minutes = Math.max(0, Math.floor((checked.getTime() - Date.parse(start)) / 60000));
+  const hours = Math.floor(minutes / 60);
+  if (hours) return `${hours} h ${minutes % 60} min`;
+  return minutes ? `${minutes} min` : "<1 min";
 }
 
 function Stage({ status }: { status: DeliveryStatus }) {
@@ -78,6 +86,12 @@ function Details({ order, queue }: { order: ManagerDelivery; queue: ManagerQueue
       <div className="delivery-total"><dt>Food total <small>CAD</small></dt><dd>{formatMoney(order.totalCents)}</dd></div>
     </dl>
     <Actions key={order.version} order={order} queue={queue} />
+    {!!order.statusHistory?.length && <details className="delivery-status-history">
+      <summary>Service timeline</summary>
+      <ol>{order.statusHistory.map(event => <li key={event.status}>
+        <span>{statusNames[event.status]}</span><time dateTime={event.at}>{stamp(event.at)}</time>
+      </li>)}</ol>
+    </details>}
     <DeliverySlipTools key={order.id} order={order} />
   </>;
 }
@@ -124,6 +138,9 @@ function KitchenTickets({ queue }: { queue: ManagerQueue }) {
       {!orders.length && <p className="delivery-station-empty">No tickets {status === "RECEIVED" ? "waiting" : status === "PREPARING" ? "in preparation" : "with a driver"}.</p>}
       {orders.map(order => <article key={order.id} className="delivery-kitchen-ticket" aria-label={"Delivery " + order.number}>
         <div className="delivery-detail-head"><div><span>Delivery ticket</span><h3>{order.number}</h3></div><time dateTime={order.createdAt}>{stamp(order.createdAt)}</time></div>
+        {queue.checked && <p className="delivery-kitchen-elapsed">
+          {kitchenTiming[status]} <strong>{elapsed(order.updatedAt, queue.checked)}</strong>
+        </p>}
         <Items order={order} />
         <Actions key={order.version} kitchen order={order} queue={queue} />
       </article>)}

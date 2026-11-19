@@ -21,13 +21,19 @@ All endpoints use the prefix `/v1/auth`. For POST requests, send JSON from the c
 | POST `deliveries` | Stores the reviewed quote with its contact and address and returns a numbered receipt and private tracking code. |
 | POST `deliveries/track` | Accepts the private tracking code in the body. An optional number must also match. Returns food details and current status. |
 | GET `deliveries/mine` | Returns one page of deliveries for the signed-in customer. |
+| GET `deliveries/:id/reorder` | Returns reusable selections for a delivery owned by the signed-in customer. Validates current catalog availability and omits historical prices, notes, contact and address details. |
 | GET `admin/deliveries` | Lists manager-visible deliveries with contact, address and kitchen notes. Use `scope=active` or `scope=history` and the returned `nextCursor` as `after`. |
 | GET `admin/customers/:id/deliveries` | Lists delivery receipts linked to the selected customer in the manager directory. |
+| GET `admin/delivery-reports` | Returns manager-only 7- or 30-day aggregates. Use `days=7` or `days=30`. |
 | POST `admin/deliveries/:id/status` | Requires manager access and a valid `{expectedVersion,status}` command. A stale or invalid transition returns HTTP 409. |
 
 The customer generates a fresh UUID v4 for each submission and retains it during a retry. A matching retry after a lost response returns the original receipt. A changed identity, basket, quote or recipient combined with a reused identifier returns HTTP 409. Keep request IDs and tracking codes private. The server persists their hashes and immutable order snapshots. Guest tracking and signed-in receipts omit customer names, phones, addresses, delivery instructions and kitchen notes.
 
+Customers can edit dish choices, quantity and special instructions in their bag before reviewing delivery. The optional dish preference checkbox remembers selected menu options on that device. Signed-in customers can add available selections from their delivery history to the existing bag and review a new quote.
+
 Managers move received deliveries through preparation, out for delivery and delivered. Cancellation is available while received or preparing. Each status change locks the order, checks its version and records the manager and new status in the same transaction. Both terminal states appear in history.
+
+Open `/staff/reports/` to review volumes, busiest hours, frequently ordered dishes, discount use and averages for kitchen and delivery time. Reports group requests by the day they were received in Toronto. Food values, dishes, discounts and timing averages use delivered requests. Food values are estimates from the unpaid preview.
 
 Run the PostgreSQL-backed delivery checks from the repo root.
 

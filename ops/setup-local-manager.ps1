@@ -1,5 +1,6 @@
 # Provision a separate local manager on the development workstation.
 # Requires the loopback account API and database started by start-local-accounts.ps1.
+param([ValidateRange(1, 65535)][int]$WebPort = 3000)
 $ErrorActionPreference = 'Stop'
 $profileDir = Join-Path $env:LOCALAPPDATA 'WokAndChop'
 $credentialsPath = Join-Path $profileDir 'local-manager.json'
@@ -20,7 +21,7 @@ if (-not (Test-Path -LiteralPath $credentialsPath)) {
   } finally { $stream.Dispose() }
 }
 $login = Get-Content -Raw -LiteralPath $credentialsPath | ConvertFrom-Json
-$headers = @{ Origin = 'http://127.0.0.1:3000' }
+$headers = @{ Origin = "http://127.0.0.1:$WebPort" }
 $api = 'http://127.0.0.1:4000/v1/auth'
 $body = @{ name = 'Local restaurant manager'; email = $login.email; password = $login.password }
 try {

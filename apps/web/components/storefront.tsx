@@ -9,7 +9,12 @@ import {
   quotePromo,
   type MenuItem,
 } from "@wok/domain";
-import { useCart } from "../lib/cart-store";
+import { useCart, type CartLine } from "../lib/cart-store";
+import {
+  dishPreferenceKey,
+  readDishPreference,
+  writeDishPreference,
+} from "../lib/dish-preferences";
 import { useCustomer } from "../lib/customer-session";
 import StoryContent from "./story-content";
 import VisitContent from "./visit-content";
@@ -62,7 +67,9 @@ export default function Storefront({
   const scrolled = useScrollHeader();
   const [cart, setCart] = useCart();
   const [selected, setSelected] = useState<MenuItem | null>(null);
-  const [modifiers, setModifiers] = useState<string[]>([]);
+  const [modifiers, setModifiers] = useState<readonly string[]>([]);
+  const [editingLine, setEditingLine] = useState<CartLine | null>(null);
+  const [rememberOptions, setRememberOptions] = useState(false);
   const [quantity, setQuantity] = useState(1);
   const [note, setNote] = useState("");
   const [message, setMessage] = useState("");
@@ -149,20 +156,25 @@ export default function Storefront({
           .reduce((sum, option) => sum + option.priceCents, 0) ?? 0)) *
       quantity
     : 0;
-  function openItem(item: MenuItem) {
+  function openItem(item: MenuItem, line: CartLine | null = null) {
+    const preference = readDishPreference(item, customer?.id);
     setSelected(item);
-    setQuantity(1);
-    setModifiers([]);
-    setNote("");
+    setEditingLine(line);
+    setQuantity(line?.quantity ?? 1);
+    setModifiers(line ? (line.modifierIds ?? []) : (preference ?? []));
+    setRememberOptions(preference !== null);
+    setNote(line?.note ?? "");
     setFormError("");
-    itemDialog.current?.showModal();
+    const dialog = itemDialog.current;
+    if (dialog) {
+      dialog.showModal();
+      dialog.scrollTop = 0;
+    }
   }
-  function addItem(event: React.FormEvent) {
+  function saveItem(event: React.FormEvent) {
     event.preventDefault();
     if (!selected) return;
     try {
-      if (cart.length >= 40)
-        throw new Error("Your bag can hold up to 40 selections.");
       const selection = {
         itemId: selected.id,
         quantity,
@@ -170,12 +182,37 @@ export default function Storefront({
         note: normalizeNote(note),
       };
       priceLine(selection, menuItems);
-      setCart((current) => [
-        ...current,
-        { ...selection, key: crypto.randomUUID() },
-      ]);
+      setCart((current) => {
+        if (editingLine) {
+          if (!current.some((line) => line.key === editingLine.key))
+            throw new Error(
+              "This selection has already been removed from your bag.",
+            );
+          return current.map((line) =>
+            line.key === editingLine.key
+              ? { ...selection, key: line.key }
+              : line,
+          );
+        }
+        if (current.length >= 40)
+          throw new Error("Your bag can hold up to 40 selections.");
+        return [...current, { ...selection, key: crypto.randomUUID() }];
+      });
+      const preferenceSaved = writeDishPreference(
+        dishPreferenceKey(selected.id, customer?.id),
+        rememberOptions ? modifiers : null,
+      );
+      const reminder =
+        rememberOptions && !preferenceSaved
+          ? " This browser couldn’t remember your choices."
+          : "";
       itemDialog.current?.close();
-      setMessage(`${quantity} × ${selected.name} added to your bag.`);
+      if (editingLine)
+        setBagAnnouncement(`${selected.name} updated in your bag.${reminder}`);
+      else
+        setMessage(
+          `${quantity} × ${selected.name} added to your bag.${reminder}`,
+        );
     } catch (error) {
       setFormError(
         error instanceof Error
@@ -581,7 +618,7 @@ export default function Storefront({
           ×
         </button>
         {selected && (
-          <form onSubmit={addItem}>
+          <form onSubmit={saveItem}>
             {selected.image && (
               <img
                 className={`dialog-food-photo ${selected.imagePresentation === "cutout" ? "is-cutout" : ""}`}
@@ -595,44 +632,73 @@ export default function Storefront({
               <p className="sample-label">{formatMoney(selected.priceCents)}</p>
               <h2 id="item-dialog-title">{selected.name}</h2>
               <p>{selected.description}</p>
-              {selected.modifierGroups?.map((group) => (
-                <fieldset key={group.id}>
-                  <legend>
-                    {group.name} <span>Choose {group.min} · Required</span>
-                  </legend>
-                  <div className="spice-options">
-                    {group.options.map((option) => (
-                      <label
-                        key={option.id}
-                        className={
-                          modifiers.includes(option.id) ? "selected" : ""
-                        }
-                      >
-                        <input
-                          type="radio"
-                          name={group.id}
-                          value={option.id}
-                          required
-                          checked={modifiers.includes(option.id)}
-                          onChange={() =>
-                            setModifiers((current) => [
-                              ...current.filter(
-                                (id) => !group.options.some((o) => o.id === id),
-                              ),
-                              option.id,
-                            ])
+              {selected.modifierGroups?.map((group) => {
+                const radio = group.max === 1 && group.min === 1;
+                const selectedCount = group.options.filter((option) =>
+                  modifiers.includes(option.id),
+                ).length;
+                return (
+                  <fieldset key={group.id}>
+                    <legend>
+                      {group.name}{" "}
+                      <span>
+                        {group.min === 0
+                          ? `Optional · Up to ${group.max}`
+                          : `Choose ${group.min === group.max ? group.min : `${group.min}–${group.max}`}`}
+                      </span>
+                    </legend>
+                    <div className="spice-options">
+                      {group.options.map((option) => (
+                        <label
+                          key={option.id}
+                          className={
+                            modifiers.includes(option.id) ? "selected" : ""
                           }
-                        />
-                        {option.name}
-                        {option.priceCents > 0 &&
-                          ` +${formatMoney(option.priceCents)}`}
-                      </label>
-                    ))}
-                  </div>
-                </fieldset>
-              ))}
+                        >
+                          <input
+                            type={radio ? "radio" : "checkbox"}
+                            name={group.id}
+                            value={option.id}
+                            required={radio}
+                            disabled={
+                              option.available === false ||
+                              (!radio &&
+                                !modifiers.includes(option.id) &&
+                                selectedCount >= group.max)
+                            }
+                            checked={modifiers.includes(option.id)}
+                            onChange={(event) => {
+                              const checked = event.currentTarget.checked;
+                              setFormError("");
+                              setModifiers((current) => {
+                                if (!checked)
+                                  return current.filter(
+                                    (id) => id !== option.id,
+                                  );
+                                if (!radio) return [...current, option.id];
+                                return [
+                                  ...current.filter(
+                                    (id) =>
+                                      !group.options.some(
+                                        (entry) => entry.id === id,
+                                      ),
+                                  ),
+                                  option.id,
+                                ];
+                              });
+                            }}
+                          />
+                          {option.name}
+                          {option.priceCents > 0 &&
+                            ` +${formatMoney(option.priceCents)}`}
+                        </label>
+                      ))}
+                    </div>
+                  </fieldset>
+                );
+              })}
               <label className="field-label">
-                A note for the kitchen <span>Optional</span>
+                Special instructions for the kitchen <span>Optional</span>
                 <textarea
                   maxLength={240}
                   value={note}
@@ -645,6 +711,18 @@ export default function Storefront({
                 {note.length}/240 · For allergy questions, please speak to the
                 restaurant. Your note does not guarantee an allergen-free meal.
               </p>
+              {Boolean(selected.modifierGroups?.length) && (
+                <label className="remember-dish-options">
+                  <input
+                    type="checkbox"
+                    checked={rememberOptions}
+                    onChange={(event) =>
+                      setRememberOptions(event.target.checked)
+                    }
+                  />
+                  Remember these options on this device
+                </label>
+              )}
               {formError && (
                 <p role="alert" className="form-error">
                   {formError}
@@ -671,7 +749,8 @@ export default function Storefront({
                   </button>
                 </div>
                 <button type="submit" className="primary-button">
-                  Add to bag <span>{formatMoney(selectedTotal)}</span>
+                  {editingLine ? "Update bag" : "Add to bag"}{" "}
+                  <span>{formatMoney(selectedTotal)}</span>
                 </button>
               </div>
             </div>
@@ -846,14 +925,31 @@ export default function Storefront({
                               +
                             </button>
                           </div>
-                          <button
-                            type="button"
-                            className="wc-bag-remove"
-                            aria-label={`Remove ${line.name}`}
-                            onClick={() => removeBagItem(line.key, line.name)}
-                          >
-                            Remove
-                          </button>
+                          <div className="wc-bag-line-links">
+                            {item && (
+                              <button
+                                type="button"
+                                className="wc-bag-edit"
+                                aria-label={`Edit ${line.name}`}
+                                onClick={() => {
+                                  const storedLine = cart.find(
+                                    (entry) => entry.key === line.key,
+                                  );
+                                  if (storedLine) openItem(item, storedLine);
+                                }}
+                              >
+                                Edit
+                              </button>
+                            )}
+                            <button
+                              type="button"
+                              className="wc-bag-remove"
+                              aria-label={`Remove ${line.name}`}
+                              onClick={() => removeBagItem(line.key, line.name)}
+                            >
+                              Remove
+                            </button>
+                          </div>
                         </div>
                       </div>
                     </li>

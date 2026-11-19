@@ -1,4 +1,4 @@
-param([switch]$DatabaseOnly)
+param([switch]$DatabaseOnly, [ValidateRange(1, 65535)][int]$WebPort = 3000)
 $ErrorActionPreference = 'Stop'
 $projectPath = Split-Path -Parent $PSScriptRoot
 $statePath = Join-Path $PSScriptRoot '.local'
@@ -47,11 +47,13 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Manager directory migration failed.' }
     & (Join-Path $pgBin 'psql.exe') -h 127.0.0.1 -p 55440 -U wok_auth -d $dbName -v ON_ERROR_STOP=1 -f (Join-Path $projectPath 'packages\database\migrations\005_delivery_requests.up.sql')
     if ($LASTEXITCODE -ne 0) { throw 'Delivery request migration failed.' }
+    & (Join-Path $pgBin 'psql.exe') -h 127.0.0.1 -p 55440 -U wok_auth -d $dbName -v ON_ERROR_STOP=1 -f (Join-Path $projectPath 'packages\database\migrations\007_shared_preview_menu.up.sql')
+    if ($LASTEXITCODE -ne 0) { throw 'Shared preview menu migration failed.' }
   }
 } finally { $env:PGPASSWORD = $previousPgPassword }
 $env:AUTH_DATABASE_URL = "postgresql://wok_auth:$dbPassword@127.0.0.1:55440/wok_chop_auth_dev"
 $env:AUTH_TEST_DATABASE_URL = "postgresql://wok_auth:$dbPassword@127.0.0.1:55440/wok_chop_auth_test"
-$env:WEB_ORIGIN = 'http://127.0.0.1:3000'
+$env:WEB_ORIGIN = "http://127.0.0.1:$WebPort"
 $env:API_PORT = '4000'
 Write-Host 'Local account database is ready on loopback port 55440. Connection credentials remain in ignored local state.'
 if (-not $DatabaseOnly) {

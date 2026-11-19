@@ -6,10 +6,11 @@ import {
 } from "../../../packages/contracts/src/index";
 import { lunchMenuItems } from "../../../packages/domain/src/lunch-menu";
 import { menuItems } from "../../../packages/domain/src/menu";
+import type { MenuItem } from "../../../packages/domain/src/types";
 import { DomainError, priceLine } from "../../../packages/domain/src/pricing";
 import { quotePromo } from "../../../packages/domain/src/promotions";
 
-const catalog = [...lunchMenuItems, ...menuItems];
+const defaultCatalog = [...lunchMenuItems, ...menuItems];
 const ontarioFsa = /^[KLMNP]\d[ABCEGHJ-NPRSTV-Z]$/;
 const canadaLetter = /^[ABCEGHJ-NPRSTV-Z]$/;
 export const uuid = /^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$/i;
@@ -160,7 +161,7 @@ export function orderInput(body: unknown) {
     },
   };
 }
-export function prepareQuote(selection: ReturnType<typeof quoteInput>) {
+export function prepareQuote(selection: ReturnType<typeof quoteInput>, catalog: readonly MenuItem[] = defaultCatalog) {
   const areas = postalPrefixes();
   if (areas.length && !areas.includes(selection.postalCode.slice(0, 3)))
     throw new BadRequestException(
@@ -204,8 +205,8 @@ export function prepareQuote(selection: ReturnType<typeof quoteInput>) {
     throw error;
   }
 }
-export function confirmedSnapshot(input: ReturnType<typeof orderInput>) {
-  const quote = prepareQuote(input.selection);
+export function confirmedSnapshot(input: ReturnType<typeof orderInput>, catalog: readonly MenuItem[] = defaultCatalog) {
+  const quote = prepareQuote(input.selection, catalog);
   if (
     input.quoteFingerprint !== quote.quoteFingerprint ||
     (input.expectedTotalCents !== undefined &&
@@ -220,4 +221,22 @@ export function confirmedSnapshot(input: ReturnType<typeof orderInput>) {
     lines: quote.lines,
     promoCode: input.selection.promoCode,
   };
+}
+
+export function reorderSelections(lines: ReturnType<typeof confirmedSnapshot>["lines"], catalog: readonly MenuItem[] = defaultCatalog) {
+  const selections = lines.flatMap((line) => {
+    const selection = {
+      itemId: line.itemId,
+      quantity: line.quantity,
+      modifierIds: line.modifiers.map((option) => option.id),
+    };
+    try {
+      priceLine(selection, catalog);
+      return [selection];
+    } catch (error) {
+      if (!(error instanceof DomainError)) throw error;
+      return [];
+    }
+  });
+  return { selections, unavailable: lines.length - selections.length };
 }

@@ -8,6 +8,7 @@ import { useCustomer } from "../lib/customer-session";
 import { useMenuCatalog } from "../lib/menu-catalog";
 import {
   DeliveryRequestError,
+  deliveryEventTime,
   deliveryPromoKey,
   deliveryStages,
   guestReceiptKey,
@@ -16,8 +17,10 @@ import {
   saveDeliverySession,
   type Delivery,
   type DeliveryQuote,
+  type DeliveryStatusEvent,
 } from "../lib/delivery";
 import InkInscription from "./ink-inscription";
+import DeliveryScooter from "./delivery-scooter";
 import "../styles/delivery.css";
 
 type DeliveryDetails = {
@@ -75,21 +78,40 @@ function DeliveryAddress({ address }: { address: DeliveryDetails["address"] }) {
   );
 }
 
-export function DeliveryProgress({ status }: { status: Delivery["status"] }) {
+export function DeliveryProgress({
+  status,
+  history = [],
+}: {
+  status: Delivery["status"];
+  history?: DeliveryStatusEvent[];
+}) {
   const current = deliveryStages.findIndex((stage) => stage.id === status);
-  if (status === "CANCELLED")
-    return <p className="delivery-cancelled">This order was cancelled.</p>;
+  const times = new Map(history.map((event) => [event.status, event.at]));
+  const cancelled = status === "CANCELLED";
+  const stages = cancelled
+    ? [
+        ...deliveryStages.filter((stage) => times.has(stage.id)),
+        { id: "CANCELLED" as const, label: "Cancelled" },
+      ]
+    : deliveryStages;
   return (
     <ol className="delivery-progress" aria-label="Delivery progress">
-      {deliveryStages.map((stage, index) => (
-        <li
-          key={stage.id}
-          data-done={index <= current}
-          aria-current={index === current ? "step" : undefined}
-        >
-          {stage.label}
-        </li>
-      ))}
+      {stages.map((stage, index) => {
+        const time = times.get(stage.id);
+        return (
+          <li
+            key={stage.id}
+            data-done={cancelled || index <= current}
+            data-cancelled={stage.id === "CANCELLED" || undefined}
+            aria-current={stage.id === status ? "step" : undefined}
+          >
+            {stage.label}
+            {time && (
+              <time dateTime={time}>{deliveryEventTime.format(new Date(time))}</time>
+            )}
+          </li>
+        );
+      })}
     </ol>
   );
 }
@@ -102,36 +124,50 @@ function TrackDelivery({ receipt }: { receipt: Receipt | null }) {
   const [message, setMessage] = useState("");
   const [copyStatus, setCopyStatus] = useState("");
   const [pending, setPending] = useState(false);
+  const [trackingOffline, setTrackingOffline] = useState(false);
   const activeToken = useRef(receipt?.trackingToken ?? "");
+  const manualLookup = useRef(0);
 
   useEffect(() => {
     const controller = new AbortController();
+    let refreshing = false;
     const refresh = () => {
-      if (document.hidden) return;
+      if (document.hidden || refreshing) return;
       const savedToken =
         activeToken.current || readDeliverySession(guestReceiptKey);
       if (!savedToken) return;
+      refreshing = true;
+      const lookup = manualLookup.current;
       void requestDelivery<{ delivery: Delivery }>("/track", {
         method: "POST",
         body: JSON.stringify({ trackingToken: savedToken }),
-        signal: controller.signal,
+        signal: AbortSignal.any([controller.signal, AbortSignal.timeout(10000)]),
       })
         .then(({ delivery }) => {
           if (
             controller.signal.aborted ||
+            manualLookup.current !== lookup ||
             (activeToken.current && activeToken.current !== savedToken)
           )
             return;
           activeToken.current = savedToken;
           setTrackingToken((token) => token || savedToken);
+          setTrackingOffline(false);
           setDelivery((current) =>
-            current?.id === delivery.id && current.version >= delivery.version
+            current?.id === delivery.id && (
+              current.version > delivery.version ||
+              (current.version === delivery.version && current.statusHistory)
+            )
               ? current
               : delivery,
           );
         })
         .catch(() => {
-          /* A manual lookup exposes connection or code errors. */
+          if (!controller.signal.aborted && manualLookup.current === lookup && activeToken.current === savedToken)
+            setTrackingOffline(true);
+        })
+        .finally(() => {
+          refreshing = false;
         });
     };
     refresh();
@@ -146,6 +182,7 @@ function TrackDelivery({ receipt }: { receipt: Receipt | null }) {
 
   async function track(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    manualLookup.current += 1;
     setPending(true);
     setMessage("");
     setCopyStatus("");
@@ -154,9 +191,15 @@ function TrackDelivery({ receipt }: { receipt: Receipt | null }) {
       const result = await requestDelivery<{ delivery: Delivery }>("/track", {
         method: "POST",
         body: JSON.stringify({ trackingToken: token }),
+        signal: AbortSignal.timeout(10000),
       });
       activeToken.current = token;
-      setDelivery(result.delivery);
+      setDelivery((current) =>
+        current?.id === result.delivery.id && current.version > result.delivery.version
+          ? current
+          : result.delivery,
+      );
+      setTrackingOffline(false);
       saveDeliverySession(guestReceiptKey, token);
     } catch (error) {
       setMessage(
@@ -189,7 +232,12 @@ function TrackDelivery({ receipt }: { receipt: Receipt | null }) {
       </h2>
       {delivery && (
         <div aria-live="polite">
-          <DeliveryProgress status={delivery.status} />
+          <DeliveryProgress status={delivery.status} history={delivery.statusHistory} />
+          <p className="delivery-caption">
+            {trackingOffline
+              ? "Showing the latest available status. Reconnecting for updates."
+              : "Times are shown in Toronto time."}
+          </p>
           <ul className="delivery-receipt-lines">
             {delivery.items.map((item, index) => (
               <li key={index}>
@@ -266,11 +314,18 @@ export default function DeliveryContent() {
   const [pending, setPending] = useState(false);
   const [message, setMessage] = useState("");
   const [uncertain, setUncertain] = useState(false);
+  const [postalCode, setPostalCode] = useState("");
   const stageHeading = useRef<HTMLHeadingElement>(null);
   const priced = cart.map((line) => priceLine(line, menu));
   const changedBag =
     review !== null && JSON.stringify(review.cart) !== JSON.stringify(cart);
   const editing = !review && !receipt;
+  const compactPostalCode = postalCode.trim().replace(" ", "");
+  const checkedPostalCode = config?.enabled && compactPostalCode.length === 6;
+  const validPostalCode = /^[KLMNP]\d[ABCEGHJ-NPRSTV-Z]\d[ABCEGHJ-NPRSTV-Z]\d$/.test(compactPostalCode);
+  const inDeliveryArea =
+    validPostalCode &&
+    (!config?.postalPrefixes.length || config.postalPrefixes.includes(compactPostalCode.slice(0, 3)));
 
   useEffect(() => {
     const controller = new AbortController();
@@ -403,13 +458,16 @@ export default function DeliveryContent() {
   return (
     <div className="wc-delivery">
       <header className="delivery-masthead">
-        <div>
+        <div className="delivery-masthead-copy">
           <Link className="delivery-back" href="/menu/">
             ← Back to the menu
           </Link>
-          <h1>
-            Home delivery <InkInscription>開飯</InkInscription>
-          </h1>
+          <div className="delivery-masthead-title">
+            <h1>
+              <span className="delivery-title-first">Home <InkInscription>送餐</InkInscription></span>
+              <strong>delivery.</strong>
+            </h1>
+          </div>
           <p>
             Order from Wok &amp; Chop and follow your meal from the kitchen to
             your door.
@@ -418,16 +476,10 @@ export default function DeliveryContent() {
             Track an existing order ↓
           </a>
         </div>
-        <img
-          src="/images/chicken-cutout.webp"
-          width={850}
-          height={850}
-          alt=""
-        />
+        <div className="delivery-masthead-art" aria-hidden="true">
+          <DeliveryScooter />
+        </div>
       </header>
-      <p className="delivery-preview">
-        Local test orders only. Use sample contact and address details.
-      </p>
       <div className={`delivery-layout${receipt || !orderItems.length ? " delivery-layout--no-bag" : ""}`}>
         <div className="delivery-main">
           {receipt ? (
@@ -445,6 +497,20 @@ export default function DeliveryContent() {
               <a className="delivery-track-link" href="#track">
                 View delivery progress ↓
               </a>
+              {customer ? (
+                <p>
+                  <Link className="text-link" href="/account/">
+                    View your delivery history <span aria-hidden="true">→</span>
+                  </Link>
+                </p>
+              ) : (
+                <p>
+                  <Link className="text-link" href="/account/">
+                    Create an account <span aria-hidden="true">→</span>
+                  </Link>{" "}
+                  to save and reorder future deliveries.
+                </p>
+              )}
             </section>
           ) : review ? (
             <section className="delivery-panel delivery-review">
@@ -526,6 +592,33 @@ export default function DeliveryContent() {
           ) : (
             <form className="delivery-panel delivery-form" onSubmit={quote}>
               <h2>Delivery details</h2>
+              <label className="delivery-postal">
+                Ontario postal code
+                <input
+                  name="postalCode"
+                  autoComplete="postal-code"
+                  autoCapitalize="characters"
+                  required
+                  maxLength={7}
+                  value={postalCode}
+                  onChange={(event) => setPostalCode(event.target.value.toUpperCase())}
+                  aria-describedby="delivery-postal-status"
+                  aria-invalid={Boolean(checkedPostalCode && !inDeliveryArea)}
+                />
+              </label>
+              <div id="delivery-postal-status" className="delivery-postal-status" role="status">
+                {checkedPostalCode &&
+                  (!validPostalCode ? (
+                    <p className="delivery-error">Enter a valid Ontario postal code.</p>
+                  ) : inDeliveryArea ? (
+                    <p className="delivery-caption">This postal code is in the test delivery area.</p>
+                  ) : (
+                    <p className="delivery-error">
+                      This postal code is outside the test delivery area.{" "}
+                      <Link href="/contact/">Contact us for pickup information.</Link>
+                    </p>
+                  ))}
+              </div>
               <div className="delivery-fields">
                 <label>
                   Your name
@@ -581,17 +674,6 @@ export default function DeliveryContent() {
                   <span>Province</span>
                   <strong>Ontario</strong>
                 </div>
-                <label>
-                  Postal code
-                  <input
-                    name="postalCode"
-                    autoComplete="postal-code"
-                    autoCapitalize="characters"
-                    required
-                    maxLength={7}
-                    defaultValue={form.address.postalCode}
-                  />
-                </label>
                 <label className="delivery-wide">
                   Drop-off instructions <small>Optional</small>
                   <textarea
@@ -626,7 +708,7 @@ export default function DeliveryContent() {
               )}
               <button
                 className="delivery-primary"
-                disabled={pending || !config?.enabled}
+                disabled={pending || !config?.enabled || Boolean(checkedPostalCode && !inDeliveryArea)}
               >
                 {pending ? "Reviewing…" : "Review delivery"}{" "}
                 <span aria-hidden="true">→</span>

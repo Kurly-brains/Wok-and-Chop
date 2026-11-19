@@ -138,6 +138,9 @@
   padding: 8px 0;
   border-top: 1px solid var(--line);
 }
+.receipt-items--delivery li {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
 .receipt-items li > span {
   overflow-wrap: anywhere;
 }
@@ -154,6 +157,12 @@
   display: flex;
   justify-content: space-between;
   gap: 10px;
+}
+.delivery-reorder {
+  margin-top: 12px;
+}
+.delivery-reorder > p:empty {
+  margin: 0;
 }
 @media (max-width: 600px) {
   .account-section--member .customer-history {

@@ -181,3 +181,8 @@ Prompt:
 - Website asset: `apps/web/public/images/art/shared-family-meal.webp`
 - Built-in ImageGen made an original wide editorial image of a child enjoying soup during a family meal. The subject is on the left and the right side is dark to let Our Story text sit over it.
 - Export: 1599 × 900 WebP, 67,444 bytes.
+
+## Delivery scooter
+
+- Website asset: `apps/web/public/animations/delivery-scooter.json`.
+- Supplied by the restaurant owner. The original vector animation is rendered beside the delivery tracker using the lightweight Lottie SVG player.

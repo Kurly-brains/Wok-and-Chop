@@ -1,14 +1,21 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { formatMoney } from "@wok/domain";
+import {
+  DomainError,
+  formatMoney,
+  priceLine,
+  type CartSelection,
+} from "@wok/domain";
+import { setCart, type CartLine } from "../lib/cart-store";
 import {
   deliveryStages,
   requestDelivery,
   type Delivery,
 } from "../lib/delivery";
 import { API_URL } from "../lib/customer-session";
+import { getMenuCatalogSnapshot } from "../lib/menu-catalog";
 
 type Page = {
   accountId: string;
@@ -19,6 +26,105 @@ const orderDate = new Intl.DateTimeFormat("en-CA", {
   dateStyle: "medium",
   timeZone: "America/Toronto",
 });
+
+function ReorderDelivery({
+  delivery,
+  accountId,
+}: {
+  delivery: Delivery;
+  accountId: string;
+}) {
+  const request = useRef<AbortController | null>(null);
+  const reviewLink = useRef<HTMLAnchorElement>(null);
+  const [pending, setPending] = useState(false);
+  const [message, setMessage] = useState("");
+  const [added, setAdded] = useState(false);
+  useEffect(() => () => request.current?.abort(), []);
+  useEffect(() => {
+    if (added) reviewLink.current?.focus({ preventScroll: true });
+  }, [added]);
+
+  async function reorder() {
+    if (request.current || added) return;
+    const controller = new AbortController();
+    request.current = controller;
+    setPending(true);
+    setMessage("");
+    try {
+      const result = await requestDelivery<{
+        accountId: string;
+        selections: CartSelection[];
+        unavailable: number;
+      }>(`/${delivery.id}/reorder`, { signal: controller.signal });
+      if (controller.signal.aborted) return;
+      if (result.accountId !== accountId)
+        throw new Error("Sign in to reorder this delivery.");
+      const catalog = getMenuCatalogSnapshot();
+      const available = result.selections.flatMap(
+        ({ itemId, quantity, modifierIds }) => {
+          const selection = { itemId, quantity, modifierIds };
+          try {
+            priceLine(selection, catalog);
+            return [{ ...selection, key: crypto.randomUUID() }];
+          } catch (error) {
+            if (!(error instanceof DomainError)) throw error;
+            return [];
+          }
+        },
+      );
+      if (!available.length)
+        throw new Error(
+          "The choices in this delivery are no longer available.",
+        );
+      setCart((current: CartLine[]) => {
+        if (current.length + available.length > 40)
+          throw new Error(
+            "Your bag can hold up to 40 selections. Make room before adding this order.",
+          );
+        return [...current, ...available];
+      });
+      const unavailable =
+        result.unavailable + result.selections.length - available.length;
+      setAdded(true);
+      setMessage(
+        unavailable
+          ? `Available items added. ${unavailable} unavailable selection${unavailable === 1 ? " was" : "s were"} left out.`
+          : "Items added to your bag.",
+      );
+    } catch (error) {
+      if (!controller.signal.aborted)
+        setMessage(
+          error instanceof Error && !(error instanceof TypeError)
+            ? error.message
+            : "We couldn’t add these items. Try again.",
+        );
+    } finally {
+      request.current = null;
+      if (!controller.signal.aborted) setPending(false);
+    }
+  }
+
+  return (
+    <div className="delivery-reorder">
+      <div className="delivery-actions">
+        {added ? (
+          <Link className="text-link" href="/delivery/" ref={reviewLink}>
+            Review for delivery <span aria-hidden="true">→</span>
+          </Link>
+        ) : (
+          <button
+            type="button"
+            disabled={pending}
+            onClick={() => void reorder()}
+          >
+            {pending ? "Checking the menu…" : "Add to your bag again"}
+          </button>
+        )}
+      </div>
+      <p role="status">{message}</p>
+    </div>
+  );
+}
 
 export default function CustomerDeliveries({
   accountId,
@@ -102,19 +208,24 @@ export default function CustomerDeliveries({
                   {formatMoney(delivery.totalCents)}
                 </strong>
               </summary>
-              <ul className="receipt-items">
-                {delivery.items.map((item, index) => (
-                  <li key={index}>
-                    <span>
-                      {item.quantity} × {item.name}
-                      {item.modifiers.length > 0 && (
-                        <small>{item.modifiers.join(" · ")}</small>
-                      )}
-                    </span>
-                    <strong>{formatMoney(item.lineTotalCents)}</strong>
-                  </li>
-                ))}
-              </ul>
+              <div className="receipt-body">
+                <ul className="receipt-items receipt-items--delivery">
+                  {delivery.items.map((item, index) => (
+                    <li key={index}>
+                      <span>
+                        {item.quantity} × {item.name}
+                        {item.modifiers.length > 0 && (
+                          <small>{item.modifiers.join(" · ")}</small>
+                        )}
+                      </span>
+                      <strong>{formatMoney(item.lineTotalCents)}</strong>
+                    </li>
+                  ))}
+                </ul>
+                {!manager && (
+                  <ReorderDelivery delivery={delivery} accountId={accountId} />
+                )}
+              </div>
             </details>
           ))}
           <div className="delivery-actions">
