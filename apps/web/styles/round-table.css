@@ -1,0 +1,233 @@
+.round-table {
+  display: grid;
+  justify-items: center;
+  margin: 0;
+  padding: 0 clamp(8px, 2vw, 24px);
+}
+
+.round-table-layout {
+  position: relative;
+  width: min(100%, 680px);
+  aspect-ratio: 1;
+  overflow: clip;
+  overflow-clip-margin: 4px;
+}
+
+.layer-hero.has-round-table {
+  height: auto;
+  padding-top: clamp(36px, 4vw, 64px);
+}
+
+.layer-hero.has-round-table > .layer-hero-kicker,
+.layer-hero.has-round-table > h1 {
+  position: relative;
+  inset: auto;
+}
+
+.layer-hero.has-round-table > h1 {
+  margin-top: 18px;
+}
+
+.has-round-table .round-table {
+  position: relative;
+  z-index: 4;
+  padding: 0;
+  margin: clamp(-102px, -6.5vw, -68px) auto 0;
+  width: min(73.7%, 1012px);
+  aspect-ratio: 2 / 1;
+}
+
+.has-round-table .round-table-layout {
+  position: absolute;
+  inset: 0 0 auto;
+  width: 100%;
+}
+
+.has-round-table .round-table-control {
+  height: 50%;
+  border-radius: 50% 50% 0 0 / 100% 100% 0 0;
+}
+
+.has-round-table .round-table-control:focus-visible {
+  outline-color: white;
+}
+
+.layer-hero.has-round-table > .layer-hero-invitation {
+  top: 58%;
+}
+
+.has-round-table .hero-halal {
+  top: 66%;
+}
+
+.hero-headline-chopsticks {
+  position: absolute;
+  z-index: 3;
+  top: clamp(74px, 6.5vw, 106px);
+  width: auto;
+  height: clamp(170px, 20vw, 330px);
+  pointer-events: none;
+  filter: drop-shadow(0 4px 6px rgb(92 15 5 / 24%));
+}
+
+.hero-headline-chopsticks--left {
+  left: max(8%, calc(50% - 492px));
+  rotate: 19deg;
+}
+
+.hero-headline-chopsticks--right {
+  right: max(8%, calc(50% - 492px));
+  rotate: -19deg;
+}
+
+@media (max-width: 960px) {
+  .layer-hero.has-round-table {
+    display: flex;
+    flex-direction: column;
+  }
+  .has-round-table .round-table {
+    order: 1;
+    width: min(114.4%, 704px);
+    left: 50%;
+    margin: -8px 0 0;
+    translate: -50% 0;
+  }
+  .layer-hero.has-round-table > .layer-hero-invitation {
+    position: relative;
+    inset: auto;
+    width: min(calc(100% - 40px), 560px);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin: 16px auto 0;
+  }
+  .has-round-table .layer-hero-invitation .primary-button {
+    margin-top: 0;
+  }
+  .has-round-table .hero-halal {
+    display: none;
+  }
+  .hero-headline-chopsticks {
+    top: 69px;
+    height: clamp(56px, 16vw, 150px);
+  }
+  .hero-headline-chopsticks--left {
+    left: 8%;
+  }
+  .hero-headline-chopsticks--right {
+    right: 8%;
+  }
+}
+
+.round-table-turntable,
+.round-table-control {
+  position: absolute;
+  inset: 0;
+}
+
+.round-table-turntable {
+  animation: round-table-spin 80s linear -4s infinite;
+  pointer-events: none;
+}
+
+.round-table-wood {
+  animation: round-table-spin 80s linear -4s infinite;
+}
+
+.round-table-layout[data-paused="true"]
+  :is(.round-table-turntable, .round-table-wood) {
+  animation-play-state: paused;
+}
+
+.round-table-wood,
+.round-table-dish {
+  position: absolute;
+  display: block;
+  height: auto;
+  user-select: none;
+}
+
+.round-table-wood {
+  inset: 11%;
+  width: 78%;
+}
+
+.round-table-dish {
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 3px 2px rgb(39 14 8 / 18%));
+}
+
+.round-table .dish-noodles {
+  left: 32%;
+  top: 26%;
+  width: 36%;
+}
+.round-table .dish-chicken {
+  left: 74%;
+  top: 32%;
+  width: 35%;
+}
+.round-table .dish-rolls {
+  left: 68%;
+  top: 74%;
+  width: 36%;
+  clip-path: circle(48% at 49.6% 49.4%);
+}
+.round-table .dish-manchurian {
+  left: 26%;
+  top: 68%;
+  width: 39%;
+  clip-path: circle(43.7% at 48.6% 49.5%);
+}
+
+@media (max-width: 735px) {
+  .round-table .dish-noodles {
+    left: 35%;
+    top: 30%;
+  }
+  .round-table .dish-chicken {
+    left: 70%;
+    top: 35%;
+  }
+  .round-table .dish-rolls {
+    left: 65%;
+    top: 70%;
+  }
+  .round-table .dish-manchurian {
+    left: 30%;
+    top: 65%;
+  }
+}
+
+.round-table .round-table-control {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  padding: 0;
+  border-radius: 50%;
+  background: transparent;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.round-table-control:focus-visible {
+  outline: 2px solid var(--red);
+  outline-offset: 1px;
+}
+
+@keyframes round-table-spin {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .round-table-turntable,
+  .round-table-wood {
+    animation: none;
+  }
+  .round-table .round-table-control {
+    display: none;
+  }
+}

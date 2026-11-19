@@ -1,0 +1,120 @@
+.footer-feast {
+  background: white;
+  overflow: clip;
+}
+
+.footer-feast-inner {
+  display: grid;
+  grid-template-columns: minmax(0, 1.15fr) minmax(0, 1fr);
+  align-items: stretch;
+  gap: clamp(22px, 5vw, 80px);
+  max-width: 1320px;
+  margin: auto;
+  padding-inline: clamp(20px, 5vw, 76px);
+}
+
+.footer-feast-art {
+  position: relative;
+  min-width: 0;
+  min-height: clamp(215px, 22vw, 325px);
+  pointer-events: none;
+}
+
+.footer-feast-art img {
+  position: absolute;
+  display: block;
+  user-select: none;
+}
+
+.footer-feast-bowl {
+  left: -3%;
+  bottom: 0;
+  width: 93%;
+  height: auto;
+  transform: translateY(48%) rotate(-9deg);
+}
+
+.footer-feast-chopsticks {
+  left: 44%;
+  bottom: 5%;
+  height: 103%;
+  width: auto;
+  transform-origin: center bottom;
+  transform: rotate(48deg);
+}
+
+.footer-feast-copy {
+  align-self: center;
+  padding-block: clamp(28px, 3.3vw, 48px);
+  color: #332d29;
+}
+
+.footer-feast-heading {
+  display: flex;
+  align-items: center;
+  gap: clamp(10px, 1.4vw, 22px);
+}
+
+.footer-feast-heading h2 {
+  color: var(--red-dark);
+  font: 400 clamp(35px, 4.1vw, 56px) / 1.08 var(--serif);
+  letter-spacing: -0.045em;
+}
+
+.footer-feast-heading .ink-signature {
+  position: static;
+  flex: none;
+  font-size: clamp(17px, 1.6vw, 23px);
+}
+
+.footer-feast-copy p {
+  max-width: 46ch;
+  font-size: 15px;
+  line-height: 1.6;
+}
+
+.footer-feast-copy .footer-feast-hours {
+  margin: 11px 0 6px;
+  font-weight: 650;
+}
+
+.footer-feast-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 16px;
+  min-height: 44px;
+  margin-top: 5px;
+  color: var(--red-dark);
+  font-weight: 650;
+  text-decoration: none;
+}
+
+.footer-feast-link span:first-child {
+  text-decoration: underline;
+  text-underline-offset: 5px;
+}
+
+@media (max-width: 680px) {
+  .footer-feast-inner {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+  .footer-feast-copy {
+    order: -1;
+    padding: 25px 0 4px;
+  }
+  .footer-feast-art {
+    width: min(100%, 420px);
+    min-height: 0;
+    aspect-ratio: 2.35;
+    justify-self: center;
+  }
+  .footer-feast-bowl {
+    width: 86%;
+    left: -1%;
+  }
+  .footer-feast-chopsticks {
+    left: 45%;
+    height: 107%;
+  }
+}

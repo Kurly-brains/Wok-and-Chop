@@ -1,0 +1,26 @@
+.printer-guide { max-width: 1100px; }
+.printer-guide > header { max-width: 770px; margin-bottom: 28px; }
+.printer-guide > header > a { color: var(--ops-red); }
+.printer-guide > header h1 { font: 400 clamp(36px,5vw,66px)/1.08 Georgia,serif; margin: 16px 0 12px; }
+.printer-guide-layout { display: grid; grid-template-columns: minmax(165px, 230px) minmax(0, 1fr); gap: clamp(24px,5vw,60px); align-items: start; }
+.printer-guide-contents { border-top: 2px solid var(--ops-red); padding-top: 13px; }
+.printer-guide-contents ol { padding-left: 1.4em; }
+.printer-guide-contents li { padding-block: 4px; }
+.printer-guide article > section { border-top: 1px solid var(--ops-line); padding-block: 18px; }
+.printer-guide article h2 { font: 400 clamp(24px,3.5vw,34px)/1.2 Georgia,serif; margin-bottom: 10px; }
+.printer-guide article h3 { font-size: 15px; margin: 14px 0 0; }
+.printer-guide article p + p { margin-top: 10px; }
+.printer-guide pre { padding: 12px 15px; background: #fff; border-left: 2px solid var(--ops-red); line-height: 1.55; }
+.printer-guide code, .printer-guide pre { overflow-wrap: anywhere; white-space: pre-wrap; font-size: .9em; }
+.printer-evidence { margin: 0; }
+.printer-evidence div + div { margin-top: 12px; }
+.printer-evidence dt { font-weight: 700; }
+.printer-evidence dd { margin: 3px 0 0; }
+@media (max-width: 700px) { .printer-guide-layout { grid-template-columns: minmax(0,1fr); gap: 8px; } }
+@media print {
+  .ops-app:has(.printer-guide) :is(.ops-header,.ops-footer,.ops-demo-banner,.ops-skip-link,.printer-guide-contents,.printer-guide>header>a) { display: none; }
+  .ops-app:has(.printer-guide), .printer-guide pre { background: white; color: black; }
+  .printer-guide { width: auto; padding: 0; }
+  .printer-guide article h2, .printer-guide article h3 { break-after: avoid; }
+  .printer-guide-layout { display: block; }
+}

@@ -1,0 +1,316 @@
+.food-stories {
+  position: relative;
+  overflow: hidden;
+  background: #faf7f1;
+  padding: 48px 0 42px;
+  color: var(--red);
+}
+.food-stories-heading {
+  position: relative;
+  z-index: 1;
+  max-width: 560px;
+  padding-inline: 22px;
+  margin: 0 auto;
+  text-align: center;
+}
+.food-stories-heading .handwritten {
+  font-size: 22px;
+  margin-bottom: 10px;
+}
+.food-stories-heading h2 {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: 52px;
+  line-height: 1.08;
+  letter-spacing: -1.5px;
+}
+.food-stories-heading h2 strong {
+  font-family: var(--body);
+  font-weight: 700;
+}
+.food-stories-heading > p:last-child {
+  font-size: 14px;
+  line-height: 1.8;
+  color: #78746d;
+  margin-top: 14px;
+}
+.food-story-track {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  gap: 32px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  scroll-behavior: auto;
+  scrollbar-width: none;
+  width: 100%;
+  max-width: none;
+  margin: 8px auto 0;
+  padding: 15px 0 10px;
+  cursor: grab;
+  user-select: none;
+  -webkit-user-select: none;
+}
+.food-story-track::-webkit-scrollbar {
+  display: none;
+}
+.food-story-track.is-dragging {
+  cursor: grabbing;
+}
+.food-story-track:focus-visible {
+  outline: none;
+}
+.food-stories:has(.food-story-track:focus-visible) .food-stories-direction {
+  outline: 2px solid var(--red);
+  outline-offset: 5px;
+  border-radius: 4px;
+}
+.food-story-card {
+  min-width: 0;
+  flex: 0 0 clamp(360px, 36vw, 560px);
+  display: flex;
+  flex-direction: column;
+}
+.food-story-art {
+  --story-photo-size: clamp(216px, 19vw, 280px);
+  position: relative;
+  height: var(--story-photo-size);
+  z-index: 2;
+  margin: 0 0 -76px;
+  pointer-events: none;
+}
+.food-story-art > img {
+  position: absolute;
+  inset: 0;
+  width: min(100%, var(--story-photo-size));
+  margin-inline: auto;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 12px 9px #41180f25);
+  transform: rotate(-7deg);
+}
+.food-story-card:nth-child(even) .food-story-art > img {
+  transform: rotate(6deg);
+}
+.food-story-panel {
+  --banner-red: #9c211a;
+  --banner-step: 14px;
+  position: relative;
+  isolation: isolate;
+  padding: 94px 30px 26px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  color: #fff8ee;
+}
+.food-story-panel::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: var(--banner-red);
+  clip-path: polygon(
+    var(--banner-step) 0,
+    calc(100% - var(--banner-step)) 0,
+    calc(100% - var(--banner-step)) var(--banner-step),
+    100% var(--banner-step),
+    100% calc(100% - var(--banner-step)),
+    calc(100% - var(--banner-step)) calc(100% - var(--banner-step)),
+    calc(100% - var(--banner-step)) 100%,
+    var(--banner-step) 100%,
+    var(--banner-step) calc(100% - var(--banner-step)),
+    0 calc(100% - var(--banner-step)),
+    0 var(--banner-step),
+    var(--banner-step) var(--banner-step)
+  );
+}
+.story-tone-1 .food-story-panel {
+  --banner-red: #861c17;
+}
+.food-story-chapter {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  color: #f3d4a2;
+}
+.food-story-chapter::before {
+  content: "";
+  flex: 0 0 20px;
+  height: 1px;
+  background: currentColor;
+}
+.food-story-chapter > span:first-child {
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+.food-story-inscription {
+  flex: none;
+  margin-inline-start: auto;
+  font:
+    400 21px/1 "Wok Inscriptions",
+    "Kaiti TC",
+    KaiTi,
+    serif;
+  white-space: nowrap;
+}
+.food-story-panel h3 {
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: clamp(32px, 3.25vw, 48px);
+  letter-spacing: -0.04em;
+  line-height: 1.08;
+  margin: 12px 0 14px;
+}
+.food-story-description {
+  font-size: 14px;
+  line-height: 1.7;
+  color: #ffede3;
+  margin-bottom: 23px;
+}
+.food-story-note {
+  font-family: var(--serif);
+  font-style: italic;
+  color: #f3d4a2;
+  font-size: 17px;
+  line-height: 1.5;
+  margin-top: auto;
+  padding-top: 14px;
+  border-top: 1px solid rgb(243 212 162 / 38%);
+}
+.food-stories-controls {
+  max-width: 1200px;
+  width: calc(100% - 48px);
+  margin: 16px auto 0;
+  display: flex;
+  justify-content: space-between;
+  gap: 25px;
+  align-items: center;
+}
+.food-stories-direction {
+  display: flex;
+  gap: 12px;
+  align-items: center;
+  font-size: 11px;
+  color: #898278;
+}
+.food-stories-direction > span:first-child {
+  font-size: 22px;
+  color: var(--red);
+}
+.food-stories-arrows {
+  display: flex;
+  gap: 10px;
+}
+.food-stories-arrows button {
+  width: 44px;
+  height: 44px;
+  border: 1px solid #c8c1b6;
+  border-radius: 50%;
+  background: none;
+  font-size: 21px;
+  color: var(--red);
+}
+.food-stories-arrows button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.food-stories-about {
+  display: flex;
+  align-items: center;
+  gap: 35px;
+  font-size: 12px;
+  width: max-content;
+  margin: 20px auto 0;
+  padding-bottom: 10px;
+  border-bottom: 1px solid #bfb8ad;
+}
+@media (max-width: 1100px) {
+  .food-story-track {
+    gap: 28px;
+  }
+  .food-story-card {
+    flex-basis: 52%;
+  }
+  .food-stories-heading {
+    max-width: 560px;
+  }
+  .food-story-panel {
+    padding-inline: 28px;
+  }
+}
+@media (max-width: 760px) {
+  .food-stories {
+    padding: 30px 0;
+  }
+  .food-stories-heading {
+    max-width: 380px;
+  }
+  .food-stories-heading .handwritten {
+    font-size: 17px;
+  }
+  .food-stories-heading h2 {
+    font-size: 40px;
+    letter-spacing: -1px;
+  }
+  .food-stories-heading > p:last-child {
+    font-size: 12px;
+    margin-top: 17px;
+  }
+  .food-story-track {
+    gap: 18px;
+    margin-top: 5px;
+    max-width: none;
+    padding-top: 15px;
+  }
+  .food-story-card {
+    flex-basis: 85%;
+  }
+  .food-story-art {
+    --story-photo-size: clamp(175px, 45vw, 220px);
+    margin-bottom: -60px;
+  }
+  .food-story-panel {
+    --banner-step: 11px;
+    padding: 77px 22px 22px;
+  }
+  .food-story-panel h3 {
+    font-size: clamp(30px, 7.6vw, 38px);
+  }
+  .food-story-chapter > span:first-child {
+    font-size: 10px;
+  }
+  .food-story-description {
+    font-size: 13px;
+    margin-bottom: 18px;
+  }
+  .food-story-note {
+    font-size: 16px;
+  }
+  .food-stories-controls {
+    gap: 15px;
+    max-width: 450px;
+    margin-top: 14px;
+  }
+  .food-stories-direction {
+    gap: 7px;
+    font-size: 10px;
+  }
+  .food-stories-arrows {
+    gap: 6px;
+  }
+  .food-stories-arrows button {
+    width: 40px;
+    height: 40px;
+  }
+  .food-stories-about {
+    font-size: 11px;
+    margin-top: 20px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .food-story-track {
+    scroll-behavior: auto;
+  }
+}

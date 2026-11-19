@@ -1,0 +1,521 @@
+/* The drawer stays in the native dialog top layer throughout its exit transition. */
+.bag-dialog.wc-bag-drawer {
+  width: 480px;
+  max-width: 100vw;
+  height: 100dvh;
+  max-height: 100dvh;
+  inset: 0 0 0 auto;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 22px 0 0 22px;
+  color: #252521;
+  background: #fff;
+  font-family: var(--body), sans-serif;
+  overflow: hidden;
+  transform: translateX(100%);
+  transition: transform 280ms cubic-bezier(0.22, 0.68, 0, 1);
+  box-shadow: -10px 0 50px rgb(0 0 0 / 10%);
+}
+.bag-dialog.wc-bag-drawer[open] {
+  display: flex;
+  flex-direction: column;
+}
+.bag-dialog.wc-bag-drawer[data-state="open"] {
+  transform: translateX(0);
+}
+.bag-dialog.wc-bag-drawer::backdrop {
+  background: rgb(23 22 20 / 42%);
+  opacity: 0;
+  transition: opacity 280ms ease;
+}
+.bag-dialog.wc-bag-drawer[data-state="open"]::backdrop {
+  opacity: 1;
+}
+.bag-dialog.wc-bag-drawer button,
+.bag-dialog.wc-bag-drawer input {
+  font: inherit;
+}
+.bag-dialog.wc-bag-drawer button {
+  cursor: pointer;
+}
+.bag-dialog.wc-bag-drawer button:disabled {
+  cursor: not-allowed;
+  opacity: 0.38;
+}
+.bag-dialog.wc-bag-drawer :is(button, a, input, summary):focus-visible {
+  outline: 2px solid var(--red);
+  outline-offset: 3px;
+}
+.bag-dialog.wc-bag-drawer :is(h2, h3, section)[tabindex="-1"]:focus {
+  outline: none;
+}
+.bag-dialog .wc-bag-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex: 0 0 auto;
+  padding: 20px 22px 10px 26px;
+}
+.bag-dialog .wc-bag-heading > div {
+  display: flex;
+  align-items: baseline;
+  gap: 12px;
+}
+.bag-dialog .wc-bag-heading h2 {
+  margin: 0;
+  color: var(--red);
+  font:
+    750 25px/1.2 var(--body),
+    sans-serif;
+  letter-spacing: -0.7px;
+  text-transform: none;
+}
+.bag-dialog .wc-bag-heading > div > span {
+  font-size: 12px;
+  color: #72716b;
+}
+.bag-dialog .wc-bag-close {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #f3f2ee;
+  color: #373732;
+}
+.bag-dialog .wc-bag-close:hover {
+  background: #e9e7e1;
+}
+.bag-dialog .wc-bag-availability {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: 0 26px 18px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #77746c;
+}
+.bag-dialog .wc-bag-content {
+  min-height: 0;
+  flex: 1 1 auto;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  padding: 0 26px 22px;
+}
+.bag-dialog .wc-bag-location {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  border-radius: 16px 16px 24px 16px;
+  background: #eceae4;
+}
+.bag-dialog .wc-bag-location > svg {
+  flex: 0 0 auto;
+  color: var(--red);
+}
+.bag-dialog .wc-bag-location strong {
+  display: block;
+  font-size: 13px;
+  font-weight: 650;
+}
+.bag-dialog .wc-bag-location span {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #65625b;
+}
+.bag-dialog .wc-bag-lines {
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+}
+.bag-dialog .wc-bag-line {
+  display: grid;
+  grid-template-columns: 72px minmax(0, 1fr);
+  align-items: start;
+  gap: 14px;
+  padding: 20px 0;
+  border-bottom: 1px solid #eae8e2;
+}
+.bag-dialog .wc-bag-line.has-no-image {
+  grid-template-columns: minmax(0, 1fr);
+}
+.bag-dialog .wc-bag-thumbnail {
+  display: block;
+  width: 72px;
+  height: 72px;
+  border-radius: 12px;
+  object-fit: cover;
+  background: #f2f0eb;
+}
+.bag-dialog .wc-bag-thumbnail.is-cutout {
+  object-fit: contain;
+  padding: 4px;
+}
+.bag-dialog .wc-bag-line-content {
+  min-width: 0;
+}
+.bag-dialog .wc-bag-line-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 12px;
+}
+.bag-dialog .wc-bag-line-heading h3 {
+  margin: 0;
+  font:
+    650 14px/1.45 var(--body),
+    sans-serif;
+  letter-spacing: -0.15px;
+  color: #292923;
+  text-transform: none;
+}
+.bag-dialog .wc-bag-line-heading > strong {
+  flex: 0 0 auto;
+  font-size: 13px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.bag-dialog .wc-bag-modifiers,
+.bag-dialog .wc-bag-note {
+  margin: 5px 0 0;
+  font-size: 11px;
+  line-height: 1.6;
+  color: #77736b;
+  overflow-wrap: anywhere;
+}
+.bag-dialog .wc-bag-note {
+  color: #5d5a52;
+}
+.bag-dialog .wc-bag-line-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin-top: 10px;
+}
+.bag-dialog .wc-bag-quantity {
+  display: flex;
+  align-items: center;
+  background: #f1f0eb;
+  border-radius: 12px;
+}
+.bag-dialog .wc-bag-quantity button {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: #35342d;
+  border-radius: 12px;
+  font-size: 19px;
+  font-weight: 400;
+}
+.bag-dialog .wc-bag-quantity button:not(:disabled):hover {
+  background: #e5e2da;
+}
+.bag-dialog .wc-bag-quantity output {
+  min-width: 22px;
+  text-align: center;
+  font-size: 12px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+}
+.bag-dialog .wc-bag-remove {
+  min-height: 44px;
+  padding: 0 2px;
+  border: 0;
+  background: transparent;
+  color: #706b61;
+  font-size: 11px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.bag-dialog .wc-bag-remove:hover {
+  color: var(--red);
+}
+.bag-dialog .wc-bag-promo-section {
+  padding-top: 8px;
+}
+.bag-dialog .wc-bag-promo {
+  border: 0;
+}
+.bag-dialog .wc-bag-promo summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 48px;
+  padding: 8px 0;
+  list-style: none;
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+}
+.bag-dialog .wc-bag-promo summary::-webkit-details-marker {
+  display: none;
+}
+.bag-dialog .wc-bag-promo summary > span {
+  font-size: 21px;
+  font-weight: 400;
+  transition: transform 180ms ease;
+}
+.bag-dialog .wc-bag-promo[open] summary > span {
+  transform: rotate(45deg);
+}
+.bag-dialog .wc-bag-promo form {
+  padding-bottom: 12px;
+}
+.bag-dialog .wc-bag-promo-input {
+  display: flex;
+  gap: 8px;
+}
+.bag-dialog .wc-bag-promo-input input {
+  min-width: 0;
+  width: 100%;
+  height: 46px;
+  padding: 0 13px;
+  border: 1px solid #dedbd3;
+  border-radius: 10px;
+  background: #fbfaf8;
+  color: #292923;
+  font-size: 13px;
+}
+.bag-dialog .wc-bag-promo-input button {
+  flex: 0 0 76px;
+  border: 0;
+  border-radius: 10px;
+  background: #ece8e1;
+  color: #42372e;
+  font-size: 12px;
+  font-weight: 650;
+}
+.bag-dialog .wc-bag-promo form p {
+  margin: 8px 0 0;
+  color: #767168;
+  font-size: 10px;
+  line-height: 1.6;
+}
+.bag-dialog .wc-bag-promo form .wc-bag-error {
+  color: var(--red);
+}
+.bag-dialog .wc-bag-applied-code {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  padding: 8px 12px;
+  background: #f3f3ee;
+  border-radius: 12px;
+}
+.bag-dialog .wc-bag-applied-code strong {
+  display: block;
+  font-size: 12px;
+  font-weight: 650;
+}
+.bag-dialog .wc-bag-applied-code span {
+  display: block;
+  margin-top: 3px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #68695e;
+}
+.bag-dialog .wc-bag-footer {
+  flex: 0 0 auto;
+  padding: 16px 26px max(18px, env(safe-area-inset-bottom));
+  background: white;
+  box-shadow: 0 -5px 16px rgb(34 31 21 / 4%);
+}
+.bag-dialog .wc-bag-totals {
+  display: grid;
+  gap: 9px;
+  margin: 0;
+  padding: 14px 16px;
+  border-radius: 16px 16px 22px 16px;
+  background: #f1efea;
+}
+.bag-dialog .wc-bag-totals > div {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 20px;
+  font-size: 12px;
+}
+.bag-dialog .wc-bag-totals dt {
+  color: #716a60;
+}
+.bag-dialog .wc-bag-totals dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.bag-dialog .wc-bag-totals .wc-bag-discount :is(dt, dd) {
+  color: #46614a;
+}
+.bag-dialog .wc-bag-totals .wc-bag-total {
+  margin-top: 2px;
+  font-size: 15px;
+  font-weight: 700;
+}
+.bag-dialog .wc-bag-total dt {
+  color: #2b2924;
+}
+.bag-dialog .wc-bag-total dd > span {
+  font-size: 9px;
+  font-weight: 500;
+  color: #79736a;
+}
+.bag-dialog .wc-bag-tax-note {
+  margin: 8px 0 14px;
+  color: #827c71;
+  font-size: 10px;
+}
+.bag-dialog .wc-bag-primary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 20px;
+  width: 100%;
+  min-height: 50px;
+  padding: 13px 18px;
+  border: 0;
+  border-radius: 12px;
+  background: var(--red);
+  color: white;
+  text-align: left;
+  text-decoration: none;
+  font:
+    650 13px/1.5 var(--body),
+    sans-serif;
+  transition: background-color 160ms ease;
+}
+.bag-dialog .wc-bag-primary:hover {
+  background: var(--red-dark);
+}
+.bag-dialog .wc-bag-primary > span {
+  font-size: 20px;
+  line-height: 1;
+  font-weight: 400;
+}
+.bag-dialog .wc-bag-guest {
+  margin: 11px 0 0;
+  font-size: 10px;
+  line-height: 1.4;
+  color: #817a6e;
+  text-align: center;
+}
+.bag-dialog .wc-bag-guest a {
+  color: #5b5144;
+  text-underline-offset: 2px;
+}
+.bag-dialog .wc-bag-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: min(490px, 65dvh);
+  padding: 35px 10px;
+  text-align: center;
+}
+.bag-dialog .wc-bag-empty > svg {
+  margin-bottom: 22px;
+  color: #a49a88;
+}
+.bag-dialog .wc-bag-empty h3 {
+  margin: 0;
+  font:
+    650 20px/1.3 var(--body),
+    sans-serif;
+  color: var(--red);
+  letter-spacing: -0.4px;
+  text-transform: none;
+}
+.bag-dialog .wc-bag-empty p {
+  margin: 9px 0 24px;
+  font-size: 13px;
+  color: #787165;
+  line-height: 1.6;
+}
+.bag-dialog .wc-bag-empty .wc-bag-primary {
+  max-width: 280px;
+}
+.bag-dialog .wc-bag-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+@media (max-width: 520px) {
+  .bag-dialog.wc-bag-drawer {
+    width: 100%;
+    border-radius: 0;
+  }
+  .bag-dialog .wc-bag-heading {
+    padding: 16px 18px 8px 20px;
+  }
+  .bag-dialog .wc-bag-availability {
+    padding: 0 20px 15px;
+  }
+  .bag-dialog .wc-bag-content {
+    padding: 0 20px 18px;
+  }
+  .bag-dialog .wc-bag-footer {
+    padding: 14px 20px max(16px, env(safe-area-inset-bottom));
+  }
+  .bag-dialog .wc-bag-line {
+    gap: 12px;
+  }
+}
+@media (max-width: 360px) {
+  .bag-dialog .wc-bag-heading {
+    padding-left: 16px;
+  }
+  .bag-dialog .wc-bag-availability {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .bag-dialog .wc-bag-content {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .bag-dialog .wc-bag-footer {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+  .bag-dialog .wc-bag-line {
+    grid-template-columns: 56px minmax(0, 1fr);
+    gap: 10px;
+  }
+  .bag-dialog .wc-bag-thumbnail {
+    width: 56px;
+    height: 56px;
+  }
+  .bag-dialog .wc-bag-line-heading {
+    flex-wrap: wrap;
+    gap: 3px 10px;
+  }
+  .bag-dialog .wc-bag-line-heading > strong {
+    font-size: 12px;
+  }
+  .bag-dialog .wc-bag-line-heading h3 {
+    font-size: 13px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .bag-dialog.wc-bag-drawer,
+  .bag-dialog.wc-bag-drawer::backdrop,
+  .bag-dialog .wc-bag-promo summary > span,
+  .bag-dialog .wc-bag-primary {
+    transition: none;
+  }
+}

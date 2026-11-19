@@ -1,0 +1,25 @@
+.directory-main { min-height: 63vh; }
+.directory-login { display: grid; gap: 16px; max-width: 420px; border-top: 2px solid var(--ops-red); padding-top: 20px; }
+.directory-login h2, .directory-detail h2 { font: 400 30px/1.15 var(--serif); }
+.directory-login > p, .directory-placeholder { color: var(--ops-muted); line-height: 1.55; }
+.directory-login label, .directory-search label { display: grid; gap: 6px; font-weight: 600; }
+.directory-main input { width: 100%; min-width: 0; min-height: 44px; padding: 8px 12px; font: inherit; color: inherit; background: white; border: 1px solid var(--ops-line); }
+.directory-workspace { display: grid; align-items: start; grid-template-columns: minmax(0, .85fr) minmax(0, 1.15fr); gap: clamp(20px, 4vw, 60px); }
+.directory-search { display: grid; gap: 8px; margin-bottom: 15px; }
+.directory-search > div, .directory-pagination { display: flex; align-items: center; gap: 10px; }
+.directory-list { padding: 0; list-style: none; margin: 0; border-top: 1px solid var(--ops-line); }
+.directory-list li button { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 10px; width: 100%; text-align: left; background: transparent; border: none; border-bottom: 1px solid var(--ops-line); font: inherit; color: inherit; cursor: pointer; }
+.directory-list li button[aria-pressed=true] { background: #fff; box-shadow: inset 3px 0 var(--ops-red); }
+.directory-list li strong, .directory-list li small { display: block; overflow-wrap: anywhere; }
+.directory-list li small { margin-top: 4px; color: var(--ops-muted); }
+.directory-list li button > span:last-child { flex: none; color: var(--ops-muted); }
+.directory-detail, .directory-placeholder { border-top: 2px solid var(--ops-red); padding-block: 18px; overflow-wrap: anywhere; }
+.directory-detail > p { margin-top: 6px; }
+.directory-detail dl { display: flex; flex-wrap: wrap; gap: 20px 50px; margin: 18px 0; border-block: 1px solid var(--ops-line); padding: 12px 0; }
+.directory-detail dt { color: var(--ops-muted); font-size: .85em; }
+.directory-detail dd { margin: 5px 0 0; }
+.directory-pagination { justify-content: space-between; padding: 8px 0; }
+@media (max-width: 760px) {
+  .directory-workspace { grid-template-columns: 1fr; }
+  .directory-login { width: 100%; }
+}

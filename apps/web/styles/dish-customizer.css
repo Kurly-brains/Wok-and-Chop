@@ -1,0 +1,254 @@
+/* Dish choices use the same soft neutral surfaces as the food stories. */
+dialog.item-dialog {
+  width: 650px;
+  max-width: calc(100% - 32px);
+  max-height: 90dvh;
+  border: 0;
+  border-radius: 28px 28px 48px 28px;
+  background: #f1eeea;
+  box-shadow: 0 24px 90px #29171333;
+  scrollbar-width: thin;
+  scrollbar-color: #c5bcb4 transparent;
+}
+.item-dialog[open] {
+  animation: dish-dialog-enter 220ms ease-out;
+}
+.item-dialog::backdrop {
+  background: #241a176b;
+  backdrop-filter: blur(3px);
+}
+.item-dialog > .dialog-close {
+  position: sticky;
+  float: right;
+  top: 14px;
+  right: auto;
+  margin: 14px 14px -58px 0;
+  width: 42px;
+  height: 42px;
+  border: 0;
+  border-radius: 50%;
+  background: #fff;
+  color: var(--red);
+  box-shadow: 0 3px 12px #38231d0d;
+  z-index: 5;
+}
+.item-dialog > .dialog-close:hover {
+  background: var(--red);
+  color: #fff;
+}
+.item-dialog .dialog-food-photo {
+  width: calc(100% - 48px);
+  height: 210px;
+  margin: 24px 24px 0;
+  border-radius: 18px;
+  object-fit: cover;
+}
+.item-dialog .dialog-food-photo.is-cutout {
+  width: 250px;
+  height: 220px;
+  padding: 0;
+  margin: 10px auto -26px;
+  background: transparent;
+  border-radius: 0;
+  position: relative;
+  z-index: 1;
+  object-fit: contain;
+  filter: drop-shadow(0 12px 8px #44301c16);
+}
+.item-dialog .dialog-content {
+  clear: both;
+  padding: 28px 30px 24px;
+  background: #f1eeea;
+}
+.item-dialog .dialog-content > .sample-label {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--red);
+  margin-bottom: 8px;
+  padding-right: 45px;
+}
+.item-dialog .dialog-content h2 {
+  font-family: var(--body);
+  font-size: 33px;
+  font-weight: 700;
+  letter-spacing: -0.8px;
+  color: var(--red);
+  line-height: 1.15;
+  margin: 0 30px 10px 0;
+}
+.item-dialog .dialog-content > p:not(.sample-label) {
+  color: #6c655e;
+  font-size: 12px;
+  line-height: 1.7;
+}
+.item-dialog fieldset {
+  margin: 21px 0;
+}
+.item-dialog legend {
+  font-size: 13px;
+  margin-bottom: 10px;
+  color: #3f342e;
+}
+.item-dialog legend > span,
+.item-dialog .field-label > span {
+  font-size: 10px;
+  color: #786f67;
+}
+.item-dialog .spice-options {
+  gap: 9px;
+  flex-wrap: wrap;
+}
+.item-dialog .spice-options label {
+  flex: 1 1 170px;
+  min-height: 52px;
+  padding: 12px 14px;
+  border: 1px solid transparent;
+  border-radius: 12px;
+  background: #fff;
+  font-size: 12px;
+  line-height: 1.45;
+  color: #413731;
+  transition:
+    background-color 160ms,
+    border-color 160ms,
+    color 160ms;
+}
+.item-dialog .spice-options label.selected {
+  background: var(--red-soft);
+  border-color: var(--red-line);
+  color: var(--red-dark);
+}
+.item-dialog .spice-options input {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
+  margin: 0 3px 0 0;
+}
+.item-dialog .field-label {
+  color: #3f342e;
+  font-size: 13px;
+}
+.item-dialog .field-label textarea {
+  border: 1px solid #dbd5ce;
+  border-radius: 12px;
+  background: #fff;
+  padding: 13px 14px;
+  font-size: 12px;
+  min-height: 72px;
+}
+.item-dialog .field-hint {
+  font-size: 10px !important;
+  line-height: 1.6 !important;
+}
+.item-dialog .form-error {
+  border-radius: 10px;
+}
+.item-dialog .add-to-bag {
+  position: sticky;
+  bottom: -24px;
+  z-index: 3;
+  background: #f1eeea;
+  border-top: 1px solid #ddd5cd;
+  margin-top: 22px;
+  padding: 17px 0 12px;
+  gap: 12px;
+}
+.item-dialog .add-to-bag .quantity-control {
+  background: #fff;
+  border: 0;
+  border-radius: 12px;
+  overflow: hidden;
+  height: 50px;
+}
+.item-dialog .quantity-control button {
+  width: 43px;
+  height: 48px;
+  font-size: 20px;
+  color: var(--red);
+}
+.item-dialog .quantity-control output {
+  min-width: 22px;
+  font-size: 13px;
+}
+.item-dialog .add-to-bag .primary-button {
+  border-radius: 12px;
+  min-height: 50px;
+  padding: 12px 18px;
+  background: var(--red);
+  border: 1px solid var(--red);
+  font-size: 13px;
+}
+@keyframes dish-dialog-enter {
+  from {
+    opacity: 0;
+    transform: translateY(14px) scale(0.99);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+@media (max-width: 700px) {
+  dialog.item-dialog {
+    max-width: calc(100% - 20px);
+    max-height: 94dvh;
+    border-radius: 22px 22px 32px 22px;
+  }
+  .item-dialog .dialog-content {
+    padding: 24px 18px 16px;
+  }
+  .item-dialog .dialog-content h2 {
+    font-size: 28px;
+    margin-right: 18px;
+  }
+  .item-dialog .dialog-food-photo {
+    width: calc(100% - 36px);
+    margin: 18px 18px 0;
+    height: 175px;
+    border-radius: 14px;
+  }
+  .item-dialog .dialog-food-photo.is-cutout {
+    width: 210px;
+    height: 180px;
+    margin: 10px auto -20px;
+  }
+  .item-dialog fieldset {
+    margin: 18px 0;
+  }
+  .item-dialog legend {
+    font-size: 12px;
+  }
+  .item-dialog legend > span {
+    font-size: 9px;
+  }
+  .item-dialog .spice-options {
+    gap: 8px;
+  }
+  .item-dialog .spice-options label {
+    flex-basis: 130px;
+    padding: 10px;
+    font-size: 11px;
+    min-height: 50px;
+  }
+  .item-dialog .add-to-bag {
+    bottom: -16px;
+    gap: 9px;
+    padding-block: 13px 8px;
+  }
+  .item-dialog .quantity-control button {
+    width: 36px;
+  }
+  .item-dialog .add-to-bag .primary-button {
+    font-size: 12px;
+    padding: 10px 12px;
+    gap: 8px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .item-dialog[open] {
+    animation: none;
+  }
+  .item-dialog .spice-options label {
+    transition: none;
+  }
+}

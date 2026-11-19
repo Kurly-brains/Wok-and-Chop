@@ -1,0 +1,15 @@
+{
+  "name": "wok-and-chop", "version": "0.1.0", "private": true,
+  "packageManager": "pnpm@10.33.2",
+  "scripts": {
+    "dev": "pnpm --filter @wok/web dev",
+    "build": "pnpm --filter @wok/web build && pnpm --filter @wok/api build",
+    "typecheck": "pnpm --filter @wok/web typecheck && pnpm --filter @wok/api typecheck && tsc -p tsconfig.packages.json --noEmit",
+    "test": "tsx --test tests/domain/*.test.ts",
+    "test:integration": "pnpm --filter @wok/api test",
+    "lint": "eslint apps/web --max-warnings 0",
+    "format": "prettier --write apps/web packages tests README.md",
+    "preview": "pnpm --filter @wok/web preview"
+  },
+  "devDependencies": {"typescript":"5.9.3","tsx":"4.23.15","@types/node":"26.6.6","prettier":"3.6.2","eslint":"9.39.1","eslint-config-next":"16.4.6"}
+}

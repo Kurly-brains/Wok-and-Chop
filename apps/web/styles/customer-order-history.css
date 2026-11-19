@@ -1,0 +1,182 @@
+.account-section--member {
+  row-gap: clamp(24px, 4vw, 46px);
+}
+.account-section--member .account-illustration {
+  max-width: 200px;
+}
+.customer-history {
+  min-width: 0;
+  grid-column: 1 / -1;
+  padding-top: 24px;
+  border-top: 2px solid var(--red);
+}
+.customer-history h2 {
+  margin: 0 0 18px;
+  font: 400 clamp(30px, 4vw, 46px) / 1.12 var(--serif);
+  color: var(--red);
+}
+.customer-history p,
+.customer-history dt,
+.receipt-number time,
+.receipt-items small {
+  color: var(--muted);
+}
+.customer-history p,
+.receipt-items {
+  font-size: 14px;
+  line-height: 1.5;
+}
+.customer-history button,
+.customer-history .text-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 44px;
+  margin-top: 8px;
+  border: 0;
+  border-bottom: 1px solid currentColor;
+  background: transparent;
+  color: var(--red);
+  font: 600 14px var(--body);
+  cursor: pointer;
+}
+.customer-history button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.customer-history :is(button, summary, a):focus-visible {
+  outline: 2px solid var(--red);
+  outline-offset: 3px;
+}
+.history-empty {
+  padding: 4px 0 10px;
+}
+.history-empty h3 {
+  font-size: 20px;
+  margin: 0 0 5px;
+}
+.receipt-list {
+  border-block-start: 1px solid var(--line);
+}
+.pickup-receipt {
+  border-bottom: 1px solid var(--line);
+}
+.pickup-receipt summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(120px, 1fr) auto 18px;
+  align-items: center;
+  gap: 10px 20px;
+  padding: 15px 4px;
+  cursor: pointer;
+  list-style: none;
+}
+.pickup-receipt summary::-webkit-details-marker {
+  display: none;
+}
+.pickup-receipt summary:hover .receipt-number,
+.pickup-receipt[open] .receipt-number {
+  color: var(--red);
+}
+.receipt-number {
+  overflow-wrap: anywhere;
+  font-weight: 700;
+}
+.receipt-number time,
+.receipt-items small {
+  display: block;
+  margin-top: 3px;
+  font-size: 12px;
+  font-weight: 400;
+}
+.receipt-total,
+.receipt-quantity {
+  font-variant-numeric: tabular-nums;
+}
+.receipt-state {
+  font-size: 13px;
+}
+.receipt-state[data-state="READY"],
+.receipt-state[data-state="COMPLETED"] {
+  color: #285744;
+}
+.receipt-chevron {
+  display: grid;
+  place-items: center;
+  color: var(--red);
+}
+.pickup-receipt[open] .receipt-chevron {
+  transform: rotate(180deg);
+}
+.receipt-body {
+  padding: 2px 4px 22px;
+}
+.receipt-metadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 36px;
+  margin: 0 0 15px;
+}
+.receipt-metadata dt {
+  font-size: 12px;
+}
+.receipt-metadata dd {
+  font-size: 14px;
+  margin: 2px 0;
+}
+.receipt-items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.receipt-items li,
+.receipt-sum {
+  display: grid;
+  gap: 10px;
+}
+.receipt-items li {
+  grid-template-columns: auto 1fr auto;
+  padding: 8px 0;
+  border-top: 1px solid var(--line);
+}
+.receipt-items li > span {
+  overflow-wrap: anywhere;
+}
+.receipt-quantity {
+  color: var(--muted);
+}
+.receipt-sum {
+  grid-template-columns: 1fr auto;
+  padding-top: 10px;
+  border-top: 1px solid var(--line);
+  font-size: 14px;
+}
+.customer-history nav {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+@media (max-width: 600px) {
+  .account-section--member .customer-history {
+    margin-top: 24px;
+  }
+  .pickup-receipt summary {
+    grid-template-columns: minmax(0, 1fr) auto 16px;
+    gap: 4px 10px;
+  }
+  .receipt-number {
+    grid-column: 1;
+    grid-row: 1;
+  }
+  .receipt-state {
+    grid-column: 1;
+    grid-row: 2;
+  }
+  .receipt-total {
+    grid-column: 2;
+    grid-row: 1 / 3;
+  }
+  .receipt-chevron {
+    grid-column: 3;
+    grid-row: 1 / 3;
+  }
+}

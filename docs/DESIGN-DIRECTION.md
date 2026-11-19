@@ -1,0 +1,23 @@
+# Current design direction
+
+This is the current owner-directed visual baseline. Preserve the original red homepage hero/category sections and the separate lower draggable Chinese-food stories. The actual lunch Menu page now uses a full-width food-photo banner and a photo grid on white.
+
+- Use the supplied logo's exact primary red (`#c90109`), pure white (`#ffffff`), and restrained jade section colour, with navigation tones derived from the brand red. Follow the shared theme variables. Keep the tighter section spacing while retaining readable grouping and clear touch targets.
+- Use the supplied BOX PNG before scrolling, Horizontal PNG after scrolling, and supplied Favicon. The logo panel has square corners (0 px radius), with a 140 × 118 px desktop box and 96 × 90 px mobile box. Desktop navigation uses a 20 px gap. Final desktop/mobile checks confirmed the supplied assets and horizontal-logo fit after scrolling.
+- Pair regular Georgia serif headings in sentence case with selective bold DM Sans emphasis.
+- Keep Home, Menu, Our Story, and Visit as distinct, concise pages with several short sections.
+- Use purposeful Chinese kitchen artwork and occasional food cutouts in supporting sections; omit arbitrary backdrop rectangles and repeated oversized food images.
+- Keep marketing sections free of decorative card frames, heavy section borders, gradients, glow and repetitive boxed content. Use space, typography and restrained rules for hierarchy.
+- Keep the original red homepage hero and the Noodles/From the wok/Small plates category sections as accepted, with the latest overall colour/spacing refinements. Add one distinct full-viewport lower section with four standalone food stories in an infinitely looping, freely draggable track, partially visible neighbouring cards and navigation controls. Do not show a position indicator or progress bar. Do not replace the hero or categories with a menu grid or carousel.
+- Make the “Chinese roots. Hakka soul.” home-story band a compact text-only introduction. Remove the noodle/chopstick artwork from that band.
+- Present all 37 owner-supplied lunch items on `/menu/` with a full-width food-photo banner, outlined category filters and a four-column dish grid on desktop, reducing to two columns on mobile. This replaces the earlier paper/hover menu presentation.
+- Lower homepage cards tell standalone Chinese-food stories. They have no prices, lunch labels, order buttons or menu-editor featured controls. The story component is independent of the lunch catalog.
+- Read lunch-menu prices and images from the local editor. Saved photo/cutout choices take precedence over default assets. Regular photographs keep their backgrounds, transparent cutouts use contain sizing, and deliberately missing images retain a fallback. Uploaded photos do not need background removal.
+- Show photos and brief dish details directly in the grid. Once a dish is in the bag, its card uses a deep-red highlight, checkmark and quantity derived from actual cart lines. Removing its last quantity clears the added state. Keep rice, soup/pop, preparation and style selectors in the separate choose-dish modal. If a dish has no assigned image, preserve readable details without substituting an unrelated dish image.
+- Use a continuous Chinese-inspired closed rectangular lattice at full-width section edges. The reusable `public/patterns/lattice.svg` connects across tile edges with consistent spacing; do not indent the strip or introduce irregular broken motifs.
+- Public copy uses “Online ordering opens soon” rather than sample, preview, or illustrative labels, as explicitly requested by the owner. This wording does not enable checkout or change the underlying fixture-data status.
+- Use only supplied restaurant facts and halal wording; do not invent opening hours, telephone numbers, founding history, chef biographies, awards, or certifications.
+
+Story uses one unframed chicken cutout. Visit uses an unframed typographic address and concise pickup guide. Home’s supporting pickup section uses `chinese-kitchen-art.webp` as a self-contained brush illustration. The home-story introduction is text-only; the lower draggable food stories remain independent. Asset loading, pattern continuity, spacing, and responsive rendering require visual QA in the assembled pages.
+
+The data, lunch inclusions and local-editing boundaries are recorded in [LUNCH-MENU.md](LUNCH-MENU.md). Story-card dragging must preserve normal page scrolling, and keyboard/navigation controls must remain available. Chopstick decoration is visual only and must not intercept interaction or add meaningless screen-reader content.

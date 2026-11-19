@@ -1,0 +1,71 @@
+@font-face {
+  font-family: "Wok Inscriptions";
+  src: url("/fonts/wok-inscriptions.woff2") format("woff2");
+  font-weight: 400;
+  font-display: swap;
+}
+
+.ink-seal, .ink-signature {
+  font: 400 19px/1 "Wok Inscriptions", "Kaiti TC", KaiTi, serif;
+  letter-spacing: 0;
+  white-space: nowrap;
+  pointer-events: none;
+  user-select: none;
+}
+.ink-seal {
+  display: inline-block;
+  flex: none;
+  color: var(--red-dark);
+  padding: .16em .23em .19em;
+  border: 1px solid currentColor;
+  transform: rotate(-3deg);
+}
+.inscription-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.layer-hero-kicker.inscription-line { justify-content: center; }
+.layer-hero-kicker .ink-seal { color: #fff2db; }
+.menu-photo-banner h1 {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: .16em;
+}
+.menu-photo-banner h1 .ink-seal {
+  writing-mode: vertical-rl;
+  margin: 0;
+  color: white;
+  font-size: clamp(16px, 1.6vw, 22px);
+}
+.wc-home-kitchen-art { position: relative; }
+.ink-signature {
+  position: absolute;
+  z-index: 1;
+  inset: 7% auto auto 4%;
+  writing-mode: vertical-rl;
+  text-orientation: upright;
+  font-size: clamp(23px, 2.35vw, 35px);
+  letter-spacing: .09em;
+  color: #493a32;
+}
+.ink-signature .ink-seal {
+  display: inline-block;
+  margin-block: .04em;
+  margin-inline-start: .55em;
+  vertical-align: middle;
+  font-size: .5em;
+  color: #fff;
+  background: var(--red-dark);
+  border: 0;
+}
+.wc-story-art .ink-signature { inset: 19% 3% auto auto; }
+.wc-story-page .wc-story-art { padding-inline-end: clamp(30px, 3vw, 50px); }
+.wc-contact-art .ink-signature { inset: auto auto 53% 5%; }
+
+@media (max-width: 760px) {
+  .layer-hero-kicker .ink-seal { font-size: 15px; }
+  .wc-contact-art .ink-signature { inset: 7% auto auto 4%; }
+}

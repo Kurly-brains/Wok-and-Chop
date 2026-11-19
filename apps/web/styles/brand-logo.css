@@ -1,0 +1,143 @@
+/* Original supplied PNG artwork; the box frame crops transparent padding only. */
+.site-header .wordmark.brand-logo {
+  display: block;
+  width: 140px;
+  height: 118px;
+  min-height: 118px;
+  padding: 0;
+  overflow: hidden;
+  background: #fff;
+  border: 1px solid #e4dfd8;
+  border-radius: 0;
+  transition:
+    width 280ms ease,
+    height 280ms ease,
+    min-height 280ms ease;
+}
+.site-header .brand-logo .brand-logo-frame {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  display: block;
+  width: calc(100% - 18px);
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  line-height: 0;
+  pointer-events: none;
+  transform: translate(-50%, -50%);
+  transition:
+    opacity 180ms ease,
+    transform 280ms ease;
+}
+.site-header .brand-logo .brand-logo-box {
+  width: calc(100% - 10px);
+  aspect-ratio: 1858 / 1247;
+  opacity: 1;
+}
+.site-header .brand-logo-box img {
+  position: absolute;
+  left: -3.8213%;
+  top: -29.7514%;
+  width: 107.6426%;
+  height: auto;
+  max-width: none;
+  display: block;
+}
+.site-header .brand-logo .brand-logo-horizontal {
+  width: calc(100% - 20px);
+  aspect-ratio: 2908 / 968;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.94);
+}
+.site-header .brand-logo-horizontal img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+}
+.site-header.is-scrolled .wordmark.brand-logo {
+  width: 184px;
+  height: 76px;
+  min-height: 76px;
+  padding: 0;
+  border-radius: 0;
+}
+.site-header.is-scrolled .brand-logo .brand-logo-box {
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.9);
+}
+.site-header.is-scrolled .brand-logo .brand-logo-horizontal {
+  opacity: 1;
+  transform: translate(-50%, -50%);
+}
+.site-header .brand-logo + nav {
+  margin-left: 160px;
+}
+.site-header.is-scrolled .brand-logo + nav {
+  margin-left: 204px;
+}
+.site-footer .footer-name.brand-logo-footer {
+  display: block;
+  flex: 0 0 260px;
+  width: 260px;
+  max-width: 100%;
+  padding: 0;
+  font-size: 0;
+  line-height: 0;
+}
+.brand-logo-footer img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+@media (max-width: 1100px) {
+  .site-header .wordmark.brand-logo {
+    width: 125px;
+    height: 110px;
+    min-height: 110px;
+  }
+  .site-header.is-scrolled .wordmark.brand-logo {
+    width: 176px;
+    height: 76px;
+    min-height: 76px;
+  }
+  .site-header .brand-logo + nav {
+    margin-left: 145px;
+  }
+  .site-header.is-scrolled .brand-logo + nav {
+    margin-left: 196px;
+  }
+}
+@media (max-width: 760px) {
+  .site-header .wordmark.brand-logo {
+    width: 96px;
+    height: 90px;
+    min-height: 90px;
+  }
+  .site-header .brand-logo .brand-logo-box {
+    width: calc(100% - 10px);
+  }
+  .site-header.is-scrolled .wordmark.brand-logo {
+    width: 130px;
+    height: 78px;
+    min-height: 78px;
+  }
+  .site-header .brand-logo .brand-logo-horizontal {
+    width: calc(100% - 12px);
+  }
+  .site-footer .footer-name.brand-logo-footer {
+    flex-basis: 100%;
+    width: 100%;
+  }
+  .brand-logo-footer img {
+    width: 220px;
+    max-width: 100%;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .site-header .wordmark.brand-logo,
+  .site-header .brand-logo .brand-logo-frame {
+    transition: none;
+  }
+}

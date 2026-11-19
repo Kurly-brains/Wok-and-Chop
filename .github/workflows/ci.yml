@@ -1,0 +1,77 @@
+name: Verify website and domain
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    env:
+      NEXT_TELEMETRY_DISABLED: "1"
+    services:
+      postgres:
+        image: postgres:17.12-alpine
+        env:
+          POSTGRES_USER: wok_ci
+          POSTGRES_DB: wok_chop_auth_test
+          # This disposable runner-local test database contains synthetic data only.
+          POSTGRES_HOST_AUTH_METHOD: trust
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U wok_ci -d wok_chop_auth_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 12
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+        with:
+          persist-credentials: false
+      - name: Install pinned pnpm
+        uses: pnpm/action-setup@73e46992e05b19abd31f2f3c20e0e7370d762115 # v6
+        with:
+          version: 10.33.2
+          run_install: false
+      - name: Install Node.js
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7
+        with:
+          node-version: 24.14.0
+          cache: pnpm
+          cache-dependency-path: pnpm-lock.yaml
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Check instruction synchronization
+        run: node ops/sync-agent-instructions.mjs --check
+      - name: Generate route types
+        run: pnpm --filter @wok/web exec next typegen
+      - name: Typecheck
+        run: pnpm typecheck
+      - name: Domain and promotion tests
+        run: pnpm test
+      - name: Check disposable database migrations and constraints
+        env:
+          POSTGRES_CONTAINER_ID: ${{ job.services.postgres.id }}
+        run: |
+          docker exec -i "$POSTGRES_CONTAINER_ID" psql -U wok_ci -d wok_chop_auth_test -v ON_ERROR_STOP=1 < packages/database/migrations/001_foundation.up.sql
+          docker exec -i "$POSTGRES_CONTAINER_ID" psql -U wok_ci -d wok_chop_auth_test -v ON_ERROR_STOP=1 < packages/database/test-foundation.sql
+          docker exec -i "$POSTGRES_CONTAINER_ID" psql -U wok_ci -d wok_chop_auth_test -v ON_ERROR_STOP=1 < packages/database/migrations/001_foundation.down.sql
+          for migration in packages/database/migrations/*.up.sql; do
+            docker exec -i "$POSTGRES_CONTAINER_ID" psql -U wok_ci -d wok_chop_auth_test -v ON_ERROR_STOP=1 < "$migration"
+          done
+      - name: API and persistent account tests
+        env:
+          AUTH_TEST_DATABASE_URL: postgresql://wok_ci@127.0.0.1:5432/wok_chop_auth_test
+        run: pnpm test:integration
+      - name: Build website and API
+        run: pnpm build

@@ -1,0 +1,535 @@
+.restaurant-menu {
+  background: #fff;
+  color: #292723;
+}
+.menu-photo-banner {
+  position: relative;
+  min-height: 250px;
+  display: grid;
+  place-items: center;
+  isolation: isolate;
+  overflow: hidden;
+  text-align: center;
+  color: #fff;
+}
+.menu-photo-banner > img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 56%;
+  z-index: -2;
+}
+.menu-photo-banner::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  background: #24130d66;
+  z-index: -1;
+}
+.menu-photo-banner > div {
+  padding: 28px 20px;
+}
+.menu-photo-banner p {
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  margin-bottom: 3px;
+}
+.menu-photo-banner h1 {
+  font-family: var(--serif);
+  font-size: clamp(48px, 5.5vw, 76px);
+  font-weight: 400;
+  line-height: 1.15;
+}
+.menu-photo-banner span {
+  display: block;
+  margin-top: 8px;
+  font-size: 13px;
+}
+.menu-page-content {
+  width: min(1160px, calc(100% - 64px));
+  margin: auto;
+  padding: 28px 0 38px;
+}
+.menu-category-tabs {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.menu-category-tabs button {
+  min-height: 36px;
+  padding: 7px 17px;
+  border: 1px solid #7f7b74;
+  border-radius: 0;
+  background: #fff;
+  color: #312b27;
+  text-transform: uppercase;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  transition:
+    background-color 180ms,
+    color 180ms,
+    border-color 180ms;
+}
+.menu-category-tabs button[aria-pressed="true"] {
+  background: var(--red);
+  border-color: var(--red);
+  color: #fff;
+}
+.menu-lunch-details {
+  display: grid;
+  grid-template-columns: 0.8fr 1.2fr;
+  align-items: center;
+  gap: 36px;
+  padding: 20px 0;
+  margin-top: 24px;
+  border-block: 1px solid #dedbd5;
+}
+.menu-lunch-details h2 {
+  font-family: var(--serif);
+  font-size: 26px;
+  font-weight: 400;
+  color: var(--red);
+  line-height: 1.2;
+}
+.menu-lunch-hours {
+  font-size: 10px;
+  margin-top: 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+.menu-lunch-details > p {
+  font-size: 12px;
+  line-height: 1.75;
+  color: #68625b;
+}
+.menu-grid-toolbar {
+  display: flex;
+  align-items: center;
+  gap: 22px;
+  margin: 20px 0 26px;
+}
+.menu-grid-search {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-width: 0;
+}
+.menu-grid-search > svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+}
+.menu-grid-search input {
+  border: 0;
+  padding: 8px 0;
+  width: 175px;
+  min-width: 0;
+  background: transparent;
+  font-size: 12px;
+}
+.menu-result-count {
+  font-size: 11px;
+  color: #736c65;
+}
+.menu-bag-summary {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 15px;
+  margin-left: auto;
+  min-height: 40px;
+  padding: 8px 14px;
+  border: 1px solid #d2c9c0;
+  color: var(--red);
+  background: #fff;
+  font-size: 11px;
+}
+.menu-dish-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 28px 18px;
+}
+.menu-dish-card {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: #fff;
+  border-radius: 5px;
+  transition:
+    background-color 220ms,
+    color 220ms,
+    box-shadow 220ms;
+  overflow: hidden;
+}
+.menu-dish-photo {
+  width: 100%;
+  position: relative;
+  aspect-ratio: 1.12;
+  border: 0;
+  padding: 0;
+  background: transparent;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+.menu-dish-photo img {
+  height: 100%;
+  width: 100%;
+  object-fit: cover;
+  transition: transform 260ms ease;
+}
+.menu-dish-photo.is-cutout img {
+  object-fit: contain;
+  padding: 7px;
+}
+.menu-dish-photo:disabled {
+  opacity: 1;
+}
+.menu-dish-sold-out {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  color: #fff;
+  background: #423c35;
+  padding: 5px 9px;
+  font-size: 10px;
+}
+.menu-dish-no-photo {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  color: #ac9891;
+  background: #f7f6f4;
+}
+.menu-dish-no-photo svg {
+  width: 60px;
+  height: 48px;
+  margin-bottom: 15px;
+}
+.menu-dish-no-photo > span {
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.12em;
+}
+.menu-dish-no-photo > small {
+  font-size: 11px;
+  margin-top: 5px;
+}
+.menu-dish-copy {
+  padding: 16px 13px 14px;
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  text-align: center;
+}
+.menu-dish-copy h2 {
+  font-family: var(--body);
+  font-size: 15px;
+  font-weight: 700;
+  line-height: 1.35;
+  color: var(--red);
+  margin-bottom: 8px;
+}
+.menu-dish-description {
+  font-size: 11px;
+  line-height: 1.65;
+  color: #6b645d;
+}
+.menu-dish-flags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 3px 7px;
+  font-size: 9px;
+  color: var(--red-dark);
+  line-height: 1.55;
+  padding-top: 9px;
+  margin-bottom: 14px;
+}
+.menu-dish-flags:empty {
+  padding-top: 0;
+}
+.menu-dish-flags > span + span::before {
+  content: "·";
+  margin-right: 7px;
+}
+.menu-dish-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: auto;
+}
+.menu-dish-actions > strong {
+  font-size: 15px;
+  color: #332721;
+}
+.menu-dish-actions > button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  min-height: 38px;
+  padding: 7px 14px;
+  border: 1px solid var(--red);
+  border-radius: 2px;
+  color: #fff;
+  background: var(--red);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+  transition:
+    background-color 180ms,
+    color 180ms;
+}
+.menu-dish-actions > button > span {
+  font-size: 19px;
+  line-height: 1;
+  font-weight: 400;
+}
+.menu-dish-added {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--red);
+  background: #fff;
+  box-shadow: 0 2px 7px #35161114;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 6px 9px;
+  border-radius: 2px;
+}
+.menu-dish-added svg {
+  width: 16px;
+  height: 16px;
+}
+.menu-dish-card.is-added {
+  background: var(--red);
+  color: #fff;
+  box-shadow: 0 8px 18px rgb(var(--red-rgb) / 11%);
+  animation: menu-added-in 350ms ease-out;
+}
+.menu-dish-card.is-added .menu-dish-copy h2,
+.menu-dish-card.is-added .menu-dish-actions > strong {
+  color: #fff;
+}
+.menu-dish-card.is-added .menu-dish-description,
+.menu-dish-card.is-added .menu-dish-flags {
+  color: var(--red-soft);
+}
+.menu-dish-card.is-added .menu-dish-actions > button {
+  color: var(--red);
+  border-color: #fff;
+  background: #fff;
+}
+.menu-dish-card.is-added .menu-dish-no-photo {
+  background: var(--red);
+  color: var(--red-soft);
+}
+.menu-grid-notes {
+  border-top: 1px solid #dedbd5;
+  margin-top: 38px;
+  padding-top: 18px;
+  font-size: 10px;
+  line-height: 1.7;
+  color: #736c65;
+  text-align: center;
+}
+.menu-grid-notes p + p {
+  margin-top: 5px;
+}
+.menu-grid-notes p:last-child {
+  margin-top: 12px;
+  color: var(--red);
+}
+.menu-grid-empty {
+  padding: 50px 10px;
+  text-align: center;
+}
+.menu-grid-empty h2 {
+  font-family: var(--serif);
+  font-size: 30px;
+  font-weight: 400;
+}
+.menu-grid-empty p {
+  margin: 12px 0;
+  font-size: 13px;
+}
+.menu-grid-empty button {
+  padding: 10px 0;
+  border: 0;
+  border-bottom: 1px solid var(--red);
+  background: none;
+  color: var(--red);
+}
+.dialog-food-photo.is-cutout {
+  object-fit: contain;
+  background: #fff;
+  padding: 10px;
+}
+@keyframes menu-added-in {
+  from {
+    box-shadow: 0 0 0 5px rgb(var(--red-rgb) / 19%);
+  }
+  to {
+    box-shadow: 0 8px 18px rgb(var(--red-rgb) / 11%);
+  }
+}
+@media (hover: hover) and (pointer: fine) {
+  .menu-dish-photo:hover img {
+    transform: scale(1.035);
+  }
+  .menu-category-tabs button:hover {
+    border-color: var(--red);
+    color: var(--red);
+  }
+  .menu-category-tabs button[aria-pressed="true"]:hover {
+    color: #fff;
+  }
+  .menu-dish-actions > button:hover {
+    background: var(--red-dark);
+    border-color: var(--red-dark);
+  }
+  .menu-dish-card.is-added .menu-dish-actions > button:hover {
+    background: var(--red-soft);
+    border-color: var(--red-soft);
+  }
+}
+@media (max-width: 1000px) {
+  .menu-dish-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .menu-page-content {
+    width: calc(100% - 44px);
+  }
+}
+@media (max-width: 700px) {
+  .menu-photo-banner {
+    min-height: 190px;
+  }
+  .menu-photo-banner h1 {
+    font-size: 49px;
+  }
+  .menu-photo-banner p {
+    font-size: 9px;
+  }
+  .menu-photo-banner span {
+    font-size: 11px;
+  }
+  .menu-page-content {
+    width: calc(100% - 28px);
+    padding-top: 21px;
+  }
+  .menu-category-tabs {
+    gap: 7px;
+  }
+  .menu-category-tabs button {
+    font-size: 10px;
+    min-height: 36px;
+    padding: 6px 11px;
+  }
+  .menu-lunch-details {
+    grid-template-columns: 1fr;
+    gap: 12px;
+    text-align: center;
+    margin-top: 20px;
+    padding: 17px 7px;
+  }
+  .menu-lunch-details h2 {
+    font-size: 25px;
+  }
+  .menu-lunch-details > p {
+    font-size: 11px;
+  }
+  .menu-lunch-hours {
+    font-size: 9px;
+  }
+  .menu-grid-toolbar {
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: 16px 0 20px;
+  }
+  .menu-grid-search {
+    flex-basis: calc(100% - 110px);
+  }
+  .menu-grid-search input {
+    width: 100%;
+  }
+  .menu-result-count {
+    font-size: 10px;
+    margin-left: auto;
+  }
+  .menu-bag-summary {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .menu-dish-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 22px 12px;
+  }
+  .menu-dish-photo {
+    aspect-ratio: 1;
+  }
+  .menu-dish-copy {
+    padding: 12px 8px 11px;
+  }
+  .menu-dish-copy h2 {
+    font-size: 13px;
+  }
+  .menu-dish-description {
+    font-size: 10px;
+    line-height: 1.6;
+  }
+  .menu-dish-flags {
+    font-size: 9px;
+    gap: 3px 5px;
+    margin-bottom: 12px;
+  }
+  .menu-dish-actions {
+    gap: 6px;
+    flex-wrap: wrap;
+  }
+  .menu-dish-actions > strong {
+    font-size: 13px;
+  }
+  .menu-dish-actions > button {
+    min-height: 36px;
+    gap: 7px;
+    padding: 7px 9px;
+    font-size: 10px;
+  }
+  .menu-dish-added {
+    top: 6px;
+    right: 6px;
+    padding: 4px 6px;
+    font-size: 9px;
+  }
+  .menu-dish-added svg {
+    width: 13px;
+    height: 13px;
+  }
+  .menu-grid-notes {
+    margin-top: 25px;
+    padding-inline: 5px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .menu-dish-card,
+  .menu-dish-photo img,
+  .menu-dish-actions > button,
+  .menu-category-tabs button {
+    transition: none;
+  }
+  .menu-dish-card.is-added {
+    animation: none;
+  }
+}

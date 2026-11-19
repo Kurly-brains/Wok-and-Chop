@@ -1,0 +1,14 @@
+.ops-printer-station { margin-block: 36px 16px; border-top: 1px solid var(--ops-ink); padding-top: 18px; }
+.ops-printer-columns { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: clamp(22px, 4vw, 56px); }
+.ops-printer-columns h3 { font-size: 17px; }
+.ops-printer-columns p { margin: 6px 0 12px; color: var(--ops-muted); }
+.ops-printer-columns details { margin-top: 12px; }
+.ops-printer-columns summary { width: fit-content; padding-block: 8px; color: var(--ops-red); cursor: pointer; }
+.ops-printer-columns pre { background: #fff; border-left: 2px solid var(--ops-line); padding: 12px; white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
+.ops-printer-station > p:not(:empty) { margin-top: 12px; }
+@media (max-width: 700px) { .ops-printer-columns { grid-template-columns: minmax(0, 1fr); } }
+.ops-delivery-slips { margin-block: 16px; }
+.ops-slip-switch { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+.ops-slip-switch button { border: 1px solid var(--ops-line); background: #fff; color: var(--ops-ink); padding: 9px 12px; }
+.ops-slip-switch button[aria-pressed=true] { background: var(--ops-ink); color: #fff; }
+.ops-delivery-slips pre { padding: 16px; background: #fff; border-left: 2px solid var(--ops-red); white-space: pre-wrap; overflow-wrap: anywhere; font-size: 13px; }
