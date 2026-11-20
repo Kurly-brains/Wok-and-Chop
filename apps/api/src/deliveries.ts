@@ -57,6 +57,11 @@ const transitions = {
 type Fulfillment = keyof typeof transitions;
 type Status = keyof typeof transitions.DELIVERY | keyof typeof transitions.PICKUP;
 const knownStatuses = new Set([...Object.keys(transitions.DELIVERY), ...Object.keys(transitions.PICKUP)]);
+const terminalStatuses = "('DELIVERED','PICKED_UP','CANCELLED')";
+const previousKitchenStatus: Partial<Record<Status, Status>> = {
+  PREPARING: "RECEIVED",
+  READY_FOR_PICKUP: "PREPARING",
+};
 const numberPrefix = { DELIVERY: "D-", PICKUP: "P-" } as const;
 type StatusEvent = { status: Status; at: string };
 type Row = {
@@ -189,7 +194,7 @@ export async function deliveryPage(
   const result = await db.query<Row>(
     `SELECT d.*, ${statusHistory}${scope === "mine" ? "" : `, ${managementHistory}`} FROM delivery_orders d WHERE ($1::uuid IS NULL OR d.customer_account_id=$1)
     AND ($2::uuid IS NULL OR d.order_number < (SELECT c.order_number FROM delivery_orders c WHERE c.id=$2 AND ($1::uuid IS NULL OR c.customer_account_id=$1) AND ($4::text IS NULL OR c.fulfillment=$4)))
-    AND ($3::text='mine' OR ($3='archived' AND d.archived_at IS NOT NULL) OR ($3 IN ('active','history') AND d.archived_at IS NULL AND ($3='history') = (d.status IN ('DELIVERED','PICKED_UP','CANCELLED'))))
+    AND ($3::text='mine' OR ($3='archived' AND d.archived_at IS NOT NULL) OR ($3 IN ('active','history') AND d.archived_at IS NULL AND ($3='history') = (d.status IN ${terminalStatuses})))
     AND ($4::text IS NULL OR d.fulfillment=$4)
     ORDER BY d.order_number DESC LIMIT 26`,
     [accountId, after ?? null, scope, fulfillment],
@@ -402,6 +407,18 @@ export class PickupController {
 @Controller("v1/auth/admin/deliveries")
 export class ManagerDeliveryController {
   constructor(@Inject(AuthService) private readonly auth: AuthService) {}
+
+  @Get("summary")
+  async summary(@Req() request: Request, @Res({ passthrough: true }) response: Response) {
+    const db = await this.auth.managerDatabase(request, response);
+    const { rows: [summary] } = await db.query<{ activeCount: number; newOrderIds: string[] }>(
+      `SELECT count(*)::int AS "activeCount",
+        coalesce(array_agg(id) FILTER (WHERE status='RECEIVED' AND version=1), '{}') AS "newOrderIds"
+       FROM delivery_orders WHERE archived_at IS NULL AND status NOT IN ${terminalStatuses}`,
+    );
+    return summary;
+  }
+
   @Get()
   async list(
     @Req() request: Request,
@@ -454,10 +471,11 @@ export class ManagerDeliveryController {
       ).rows[0];
       if (!current) throw new NotFoundException("Order not found.");
       const allowed = transitions[current.fulfillment] as Partial<Record<Status, readonly string[]>>;
+      const returning = current.fulfillment === "PICKUP" && previousKitchenStatus[current.status] === status;
       if (
         current.version !== expectedVersion ||
         current.archived_at ||
-        !allowed[current.status]?.includes(status)
+        (!returning && !allowed[current.status]?.includes(status))
       )
         throw new ConflictException(
           "The order has changed or this step is no longer available. Refresh the queue.",
@@ -472,7 +490,7 @@ export class ManagerDeliveryController {
         "INSERT INTO delivery_order_events(order_id,version,status,manager_id,previous_status) VALUES($1,$2,$3,$4,$5)",
         [updated.id, updated.version, status, accountId, current.status],
       );
-      if (updated.fulfillment === "PICKUP") await queuePickupEmails(client, updated, false);
+      if (updated.fulfillment === "PICKUP") await queuePickupEmails(client, updated, false, returning);
       const delivery = managerView(await managedOrder(client, id));
       await client.query("COMMIT");
       return { delivery };

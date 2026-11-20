@@ -168,3 +168,106 @@ test("packaged category changes preserve their original source groups", () => {
     /do not apply/,
   );
 });
+
+test("dish option prices replace individual surcharges while leaving shared defaults untouched", () => {
+  const modifierPriceOverrides = {
+    "lunch-jasmine-rice": 125,
+    "lunch-fried-rice": 0,
+    "lunch-pop": 50,
+  };
+  const patch = validatePatch({ modifierPriceOverrides });
+  const updated = applyMenuItemPatch(packaged, patch);
+  const quote = (item: typeof packaged, rice: string) =>
+    priceLine(
+      {
+        itemId: item.id,
+        quantity: 2,
+        modifierIds: [rice, "lunch-pop", "lunch-gravy"],
+      },
+      [item],
+    );
+  assert.deepEqual(updated.modifierPriceOverrides, modifierPriceOverrides);
+  assert.ok(Object.isFrozen(updated.modifierPriceOverrides));
+  assert.equal(
+    quote(updated, "lunch-jasmine-rice").lineTotalCents,
+    2 * (packaged.priceCents + 175),
+  );
+  assert.equal(
+    quote(updated, "lunch-fried-rice").lineTotalCents,
+    2 * (packaged.priceCents + 50),
+  );
+  assert.equal(
+    quote(packaged, "lunch-jasmine-rice").lineTotalCents,
+    2 * packaged.priceCents,
+  );
+  assert.equal(
+    quote(packaged, "lunch-fried-rice").lineTotalCents,
+    2 * (packaged.priceCents + 250),
+  );
+  assert.equal(updated.description, "Includes a vegetable spring roll.");
+
+  const restored = applyMenuItemPatch(updated, { modifierPriceOverrides: {} });
+  assert.deepEqual(restored.modifierPriceOverrides, {});
+  assert.deepEqual(restored.modifierGroups, packaged.modifierGroups);
+  assert.equal(restored.description, packaged.description);
+  const noRice = applyMenuItemPatch(updated, {
+    modifierGroupIds: ["lunch-soup-or-pop"],
+  });
+  assert.deepEqual(noRice.modifierPriceOverrides, { "lunch-pop": 50 });
+  assert.throws(
+    () => applyMenuItemPatch(noRice, patch),
+    /only for enabled options/,
+  );
+  for (const invalid of [
+    null,
+    [],
+    { "lunch-jasmine-rice": "100" },
+    { "lunch-jasmine-rice": -1 },
+    { "lunch-jasmine-rice": 0.5 },
+    { "lunch-jasmine-rice": 100_001 },
+    { "missing-option": 100 },
+  ]) {
+    assert.throws(
+      () => validatePatch({ modifierPriceOverrides: invalid }),
+      /modifier|Modifier/,
+    );
+  }
+});
+
+test("custom dish option prices survive storage and category changes remove inactive adjustments", () => {
+  const dish = createCustomMenuItem(
+    customId,
+    validateNewMenuItem({
+      name: "Synthetic custom dish",
+      categoryId: "lunch-chicken",
+      priceCents: 1250,
+      modifierPriceOverrides: { "lunch-dry": 175, "lunch-jasmine-rice": 250 },
+    }),
+  );
+  const {
+    id,
+    fixture: _fixture,
+    modifierGroups: _groups,
+    ...definition
+  } = JSON.parse(JSON.stringify(dish));
+  const restored = createCustomMenuItem(id, validateNewMenuItem(definition));
+  assert.deepEqual(restored.modifierGroups, dish.modifierGroups);
+  const renamed = applyMenuItemPatch(restored, { name: "Renamed dish" });
+  assert.deepEqual(renamed.modifierPriceOverrides, dish.modifierPriceOverrides);
+  const recategorized = applyMenuItemPatch(restored, {
+    categoryId: "lunch-rice-noodles",
+  });
+  assert.deepEqual(recategorized.modifierPriceOverrides, {
+    "lunch-jasmine-rice": 250,
+  });
+  assert.ok(
+    !recategorized.modifierGroups?.some(
+      (group) => group.id === "lunch-preparation",
+    ),
+  );
+  assert.throws(
+    () =>
+      validateNewMenuItem({ ...definition, categoryId: "lunch-rice-noodles" }),
+    /only for enabled options/,
+  );
+});

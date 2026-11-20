@@ -3,6 +3,7 @@ import type { IncomingMessage, RequestListener, ServerResponse } from "node:http
 import { Controller, Get, Module, Query } from "@nestjs/common";
 import { NestFactory } from "@nestjs/core";
 import type { NestExpressApplication } from "@nestjs/platform-express";
+import { defaultReservationSettings } from "../../../packages/domain/src/reservation-settings";
 import { FoundationController } from "./foundation";
 
 @Controller("v1")
@@ -29,7 +30,7 @@ class HostedPreviewController {
 
   @Get("guest-services/config")
   guestServices() {
-    return { contactEnabled: false, reservationsEnabled: false, emailEnabled: false };
+    return { contactEnabled: false, reservationsEnabled: false, emailEnabled: false, reservationSettings: defaultReservationSettings };
   }
 
   @Get("marketing/config")

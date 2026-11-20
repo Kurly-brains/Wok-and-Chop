@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { API_URL, authRequest, useCustomer } from "../lib/customer-session";
 import { ManagerSignIn } from "./operations/ManagerSignIn";
 import { OperationsShell } from "./operations/OperationsShell";
-import { availableDishModifierGroups, formatMoney, isLunchMenuItem, lunchCategories } from "@wok/domain";
+import { availableDishModifierGroups, formatMoney, isLunchMenuItem, lunchCategories, MAX_MODIFIER_PRICE_CENTS } from "@wok/domain";
 import {
   createPublishedMenuItem,
   getMenuCatalogSnapshot,
@@ -29,6 +29,7 @@ type Draft = {
   heatLevel: 0 | 1 | 2;
   containsPeanuts: boolean;
   modifierGroupIds: readonly string[];
+  modifierPriceOverrides: Readonly<Record<string, string>>;
 };
 const menuCategories = lunchCategories;
 const MAX_FILE_BYTES = 350 * 1024;
@@ -45,7 +46,11 @@ const emptyDraft: Draft = {
   heatLevel: 0,
   containsPeanuts: false,
   modifierGroupIds: [],
+  modifierPriceOverrides: {},
 };
+function priceFields(overrides: MenuCatalogItem["modifierPriceOverrides"]) {
+  return Object.fromEntries(Object.entries(overrides ?? {}).sort(([left], [right]) => left.localeCompare(right)).map(([id, cents]) => [id, dollarsFrom(cents)]));
+}
 function draftFrom(item: MenuCatalogItem): Draft {
   return {
     name: item.name,
@@ -60,20 +65,24 @@ function draftFrom(item: MenuCatalogItem): Draft {
     heatLevel: item.heatLevel ?? 0,
     containsPeanuts: item.containsPeanuts ?? false,
     modifierGroupIds: item.modifierGroups?.map(group => group.id) ?? [],
+    modifierPriceOverrides: priceFields(item.modifierPriceOverrides),
   };
 }
 function snapshot(item: MenuCatalogItem) {
   return JSON.stringify(draftFrom(item));
 }
-function centsFrom(text: string) {
-  if (!/^\d{1,4}(?:\.\d{1,2})?$/.test(text.trim()))
-    throw new Error(
-      "Enter a price from $0.01 to $2,000.00 with no more than two decimal places.",
-    );
-  const [dollars, cents = ""] = text.trim().split(".");
+function dollarsFrom(cents: number) {
+  return (cents / 100).toFixed(2);
+}
+function centsFrom(text: string, optionName?: string) {
+  const minimum = optionName ? 0 : 1;
+  const maximum = optionName ? MAX_MODIFIER_PRICE_CENTS : 200000;
+  const error = () => new Error(`Enter ${optionName ? `the price for ${optionName}` : "a price"} from ${formatMoney(minimum)} to ${formatMoney(maximum)} with no more than two decimal places.`);
+  const normalized = text.trim();
+  if (!/^\d{1,4}(?:\.\d{1,2})?$/.test(normalized)) throw error();
+  const [dollars, cents = ""] = normalized.split(".");
   const value = Number(dollars) * 100 + Number(cents.padEnd(2, "0"));
-  if (value <= 0 || value > 200000)
-    throw new Error("Enter a price from $0.01 to $2,000.00.");
+  if (value < minimum || value > maximum) throw error();
   return value;
 }
 async function imageData(file: File) {
@@ -215,6 +224,12 @@ function DishEditor({
         .map(group => group.id),
     });
   }
+  function changeOptionPrice(id: string, value?: string) {
+    const prices = { ...draft.modifierPriceOverrides };
+    if (value === undefined) delete prices[id];
+    else prices[id] = value;
+    change({ modifierPriceOverrides: Object.fromEntries(Object.entries(prices).sort(([left], [right]) => left.localeCompare(right))) });
+  }
   async function upload(file?: File) {
     if (!file) return;
     const sequence = ++uploadSequence.current;
@@ -252,6 +267,17 @@ function DishEditor({
       const previousGroups = item?.modifierGroups?.map(group => group.id) ?? [];
       const includeGroups = creating || draft.categoryId !== item?.categoryId ||
         draft.modifierGroupIds.join(",") !== previousGroups.join(",");
+      const previousPrices = item?.modifierPriceOverrides ?? {};
+      const optionPrices: Record<string, number> = {};
+      for (const group of availableGroups) {
+        if (!draft.modifierGroupIds.includes(group.id)) continue;
+        for (const option of group.options) {
+          const price = draft.modifierPriceOverrides[option.id];
+          if (option.available !== false && price !== undefined) optionPrices[option.id] = centsFrom(price, option.name);
+        }
+      }
+      const includeOptionPrices = Object.keys(optionPrices).length !== Object.keys(previousPrices).length ||
+        Object.entries(optionPrices).some(([id, price]) => previousPrices[id] !== price);
       const dish = {
         name: draft.name.trim(),
         description: draft.description.trim(),
@@ -264,6 +290,7 @@ function DishEditor({
         heatLevel: draft.heatLevel,
         containsPeanuts: draft.containsPeanuts,
         ...(includeGroups ? { modifierGroupIds: draft.modifierGroupIds } : {}),
+        ...(includeOptionPrices ? { modifierPriceOverrides: optionPrices } : {}),
       };
       let saved: MenuCatalogItem;
       if (item) {
@@ -400,24 +427,50 @@ function DishEditor({
                 <div className="menu-editor-dish-options-grid">
                   {availableGroups.map((group) => {
                     const checked = draft.modifierGroupIds.includes(group.id);
+                    const options = group.options.filter(option => option.available !== false);
                     return (
-                      <label key={group.id} className={checked ? "is-selected" : undefined}>
-                        <input
-                          type="checkbox"
-                          checked={checked}
-                          onChange={event => selectGroup(group.id, event.target.checked)}
-                        />
-                        <span>
+                      <div key={group.id} className="menu-editor-option-group">
+                        <label className={`menu-editor-option-toggle${checked ? " is-selected" : ""}`}>
+                          <input
+                            type="checkbox"
+                            checked={checked}
+                            onChange={event => selectGroup(group.id, event.target.checked)}
+                          />
                           <strong>{group.name}</strong>
-                          <small>
-                            {group.options.filter(option => option.available !== false).map((option) =>
-                              option.priceCents > 0
-                                ? `${option.name} (+${formatMoney(option.priceCents)})`
-                                : option.name,
-                            ).join(" · ")}
-                          </small>
-                        </span>
-                      </label>
+                          {!checked && <small>{options.map(option => option.name).join(" · ")}</small>}
+                        </label>
+                        {checked && options.length > 0 && <div className="menu-editor-option-price-grid">
+                          {options.map(option => {
+                            const id = `dish-option-price-${option.id}`;
+                            const override = draft.modifierPriceOverrides[option.id];
+                            return <div className="menu-editor-option-price-row" key={option.id}>
+                              <label htmlFor={id}>
+                                {option.name}
+                                {override !== undefined && <small>Default {formatMoney(option.priceCents)}</small>}
+                              </label>
+                              <div className="menu-editor-price">
+                                <span aria-hidden="true">$</span>
+                                <input
+                                  id={id}
+                                  value={override ?? dollarsFrom(option.priceCents)}
+                                  inputMode="decimal"
+                                  aria-label={`${option.name} price in Canadian dollars`}
+                                  onChange={event => changeOptionPrice(option.id, event.target.value)}
+                                />
+                              </div>
+                              {override !== undefined && <button
+                                className="menu-editor-option-price-reset"
+                                type="button"
+                                aria-label={`Reset ${option.name} to default price`}
+                                onClick={() => {
+                                  changeOptionPrice(option.id);
+                                  document.getElementById(id)?.focus();
+                                }}
+                              >Reset</button>}
+                            </div>;
+                          })}
+                        </div>}
+                      </div>
                     );
                   })}
                 </div>
@@ -425,7 +478,7 @@ function DishEditor({
               <p>{!draft.categoryId
                 ? "Choose a category to see its options."
                 : draft.modifierGroupIds.length
-                  ? "Guests choose from the selected groups when adding this dish."
+                  ? "Option prices in CAD are added to the dish price. Set an option to $0.00 to include it at no extra charge."
                   : "Guests add this dish straight to their bag."}</p>
             </fieldset>
             <label className="menu-editor-availability">

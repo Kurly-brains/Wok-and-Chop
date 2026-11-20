@@ -1,4 +1,9 @@
+import type { ReservationSettings as ReservationAvailability } from "@wok/domain";
 import { API_URL } from "./customer-session";
+
+export type { ReservationAvailability };
+
+export type ReservationSettings = ReservationAvailability & { version: number };
 
 export type GuestServiceConfig = {
   contactEnabled: boolean;
@@ -10,6 +15,7 @@ export type GuestServiceConfig = {
   maxAdvanceDays?: number;
   minLeadMinutes?: number;
   timeStepMinutes?: number;
+  reservationSettings?: ReservationAvailability;
 };
 
 export type ReservationStatus = "REQUESTED" | "CONFIRMED" | "DECLINED" | "CANCELLED";

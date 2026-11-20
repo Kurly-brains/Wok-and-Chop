@@ -312,8 +312,11 @@ export class PublishedMenuController {
       try {
         const updated = applyMenuItemPatch(current, patch);
         if (patch.modifierGroupIds !== undefined) patch.modifierGroupIds = updated.modifierGroupIds;
+        if (patch.modifierPriceOverrides !== undefined || patch.modifierGroupIds !== undefined || patch.categoryId !== undefined) {
+          patch.modifierPriceOverrides = updated.modifierPriceOverrides;
+        }
       } catch (error) {
-        throw new BadRequestException(error instanceof Error ? error.message : "Invalid menu choice groups.");
+        throw new BadRequestException(error instanceof Error ? error.message : "Invalid menu option settings.");
       }
       await client.query(
         `INSERT INTO shared_preview_menu_items(item_id,patch,updated_by) VALUES($1,$2,$3)

@@ -1,6 +1,6 @@
 "use client";
 import { useEffect, useSyncExternalStore } from "react";
-import { buildCatalog, byteLength, createCustomMenuItem, defaultCatalog, MAX_MENU_STORAGE_BYTES, validateNewMenuItem, validatePatch, type MenuCatalogItem, type MenuItemPatch, type NewMenuItem, type Overrides } from "@wok/domain";
+import { applyMenuItemPatch, buildCatalog, byteLength, createCustomMenuItem, defaultCatalog, MAX_MENU_STORAGE_BYTES, validateNewMenuItem, validatePatch, type MenuCatalogItem, type MenuItemPatch, type NewMenuItem, type Overrides } from "@wok/domain";
 import { API_URL } from "./customer-session";
 export { MAX_MENU_IMAGE_BYTES, MAX_MENU_STORAGE_BYTES, type MenuCatalogItem, type CatalogMenuItem, type MenuItemPatch } from "@wok/domain";
 
@@ -153,7 +153,9 @@ export function saveMenuItem(id: string, patch: MenuItemPatch): MenuCatalogItem 
   let raw: string | null;
   try { raw = window.localStorage.getItem(MENU_CATALOG_STORAGE_KEY); } catch { throw new Error("Browser storage is unavailable. Allow local site storage to save preview menu changes."); }
   const overrides = parseOverrides(raw);
-  overrides[id] = { ...overrides[id], ...normalized };
+  const current = buildCatalog(overrides).find(item => item.id === id)!;
+  const updated = applyMenuItemPatch(current, normalized);
+  overrides[id] = { ...overrides[id], ...normalized, modifierGroupIds: updated.modifierGroupIds, modifierPriceOverrides: updated.modifierPriceOverrides };
   const nextRaw = JSON.stringify({ version: STORAGE_VERSION, overrides });
   if (byteLength(nextRaw) > MAX_MENU_STORAGE_BYTES) throw new Error("The preview menu would exceed 2.5 MB. Use smaller images or remove an uploaded image before saving.");
   try { window.localStorage.setItem(MENU_CATALOG_STORAGE_KEY, nextRaw); } catch { throw new Error("The menu could not be saved to browser storage. Free up site storage or use smaller images; your existing menu was kept."); }

@@ -6,7 +6,6 @@ import InkInscription from "./ink-inscription";
 import {
   formatMoney,
   lunchCategories,
-  lunchMenuDetails,
   type MenuItem,
   type PricedLine,
 } from "@wok/domain";
@@ -268,11 +267,8 @@ export default function MenuContent({
             </p>
           </div>
           <p>
-            Check each dish for included sides and available options. Where
-            offered, fried rice adds{" "}
-            {formatMoney(lunchMenuDetails.friedRiceUpgradeCents)} and dry
-            preparation adds {formatMoney(lunchMenuDetails.dryPreparationCents)}
-            .
+            Each dish lists its included sides, preparation choices and any
+            extra charges.
           </p>
         </div>
         <div className="menu-grid-toolbar">

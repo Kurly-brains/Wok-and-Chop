@@ -17,8 +17,9 @@ import {
 } from "../../lib/guest-services";
 import { ManagerSignIn } from "./ManagerSignIn";
 import { OperationsShell } from "./OperationsShell";
+import { ReservationSettingsForm } from "./ReservationSettingsForm";
 
-type DeskTab = "reservations" | "contact";
+type DeskTab = "reservations" | "settings" | "contact";
 type Scope = "active" | "all";
 type ReservationPage = { reservations: StaffReservation[]; nextCursor: string | null };
 type ContactPage = { contacts: StaffContact[]; nextCursor: string | null };
@@ -346,6 +347,7 @@ function GuestDeskViews() {
         <button type="button" aria-pressed={tab === "reservations"} onClick={() => {
           if (tab !== "reservations") { setTab("reservations"); setPages([""]); }
         }}>Reservations</button>
+        <button type="button" aria-pressed={tab === "settings"} onClick={() => setTab("settings")}>Booking settings</button>
         <button type="button" aria-pressed={tab === "contact"} onClick={() => {
           if (tab !== "contact") { setTab("contact"); setPages([""]); }
         }}>Contact inbox</button>
@@ -362,7 +364,7 @@ function GuestDeskViews() {
           </div>
           <ReservationList key={`${scope}-${cursor}`} scope={scope} {...navigation} />
         </>
-      ) : <ContactList key={cursor} {...navigation} />}
+      ) : tab === "settings" ? <ReservationSettingsForm /> : <ContactList key={cursor} {...navigation} />}
     </>
   );
 }

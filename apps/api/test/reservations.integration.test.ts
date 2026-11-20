@@ -536,3 +536,288 @@ test(
     }
   },
 );
+
+test(
+  "reservation settings close dates, set public notices, and restrict new requests and staff actions",
+  { skip: !databaseUrl },
+  async () => {
+    if (new URL(databaseUrl!).pathname !== "/wok_chop_auth_test")
+      throw new Error("Dedicated test database required.");
+    const db = new Pool({ connectionString: databaseUrl });
+    const app = await createApplication({
+      authDatabaseUrl: databaseUrl,
+      webOrigin: origin,
+    });
+    const managerEmail = `booking-policy-${randomUUID()}@example.invalid`;
+    const guestEmail = `booking-guest-${randomUUID()}@example.invalid`;
+    const policyPath = "auth/admin/reservations/settings/";
+    const {
+      rows: [baseline],
+    } = await db.query(
+      "SELECT * FROM guest_reservation_settings WHERE singleton",
+    );
+    const { rows: closedDates } = await db.query(
+      "SELECT closed_date::text,notice FROM guest_reservation_closures ORDER BY closed_date",
+    );
+    try {
+      await app.listen(0, "127.0.0.1");
+      const base = `${await app.getUrl()}/v1/`;
+      const get = (path: string, cookie?: string) =>
+        fetch(base + path, { headers: cookie ? { Cookie: cookie } : {} });
+      const post = (path: string, payload: unknown, cookie?: string) =>
+        fetch(base + path, {
+          method: "POST",
+          headers: {
+            Origin: origin,
+            "Content-Type": "application/json",
+            ...(cookie ? { Cookie: cookie } : {}),
+          },
+          body: JSON.stringify(payload),
+        });
+      const register = await post("auth/register", {
+        name: "Synthetic booking manager",
+        email: managerEmail,
+        password: "Synthetic booking password!",
+      });
+      assert.equal(register.status, 201);
+      const { user } = await register.json();
+      const managerCookie = register.headers.getSetCookie()[0].split(";")[0];
+      await db.query(
+        "INSERT INTO restaurant_managers(account_id) VALUES ($1)",
+        [user.id],
+      );
+      assert.equal((await get(policyPath)).status, 401);
+      const defaults = await get(policyPath, managerCookie).then((result) =>
+        result.json(),
+      );
+      assert.deepEqual(defaults, {
+        version: baseline.version,
+        paused: false,
+        notice: "",
+        firstTime: "00:00",
+        lastTime: "23:45",
+        closures: [],
+      });
+      const dayAt = (days: number) =>
+        new Date(Date.now() + days * 86_400_000).toISOString().slice(0, 10);
+      const closedDay = dayAt(15),
+        openDay = dayAt(16);
+      const priorRequest = {
+        name: "Synthetic table request",
+        email: guestEmail,
+        phone: "6135550100",
+        partySize: 2,
+        date: closedDay,
+        time: "18:00",
+        requestId: randomUUID(),
+      };
+      const submitted = await post("reservations", priorRequest);
+      assert.equal(submitted.status, 201);
+      const original = await submitted.json();
+      const {
+        rows: [{ id }],
+      } = await db.query("SELECT id FROM guest_reservations WHERE email=$1", [
+        guestEmail,
+      ]);
+      const policy = {
+        expectedVersion: defaults.version,
+        paused: false,
+        notice: "  Seating is limited this week.  ",
+        firstTime: "16:00",
+        lastTime: "21:00",
+        closures: [
+          { date: dayAt(20), notice: "Closed" },
+          { date: closedDay, notice: "Private event today" },
+        ],
+      };
+      for (const invalid of [
+        { lastTime: "15:00" },
+        { firstTime: "16:10" },
+        { notice: "a".repeat(281) },
+        { closures: [policy.closures[0], policy.closures[0]] },
+        { closures: [{ date: "2027-02-29", notice: "Invalid date" }] },
+      ]) {
+        assert.equal(
+          (await post(policyPath, { ...policy, ...invalid }, managerCookie))
+            .status,
+          400,
+        );
+      }
+      const saves = await Promise.all([
+        post(policyPath, policy, managerCookie),
+        post(policyPath, policy, managerCookie),
+      ]);
+      assert.deepEqual(saves.map((result) => result.status).sort(), [200, 409]);
+      const updated = await saves.find((result) => result.ok)!.json();
+      const { version, ...publicSettings } = updated;
+      assert.equal(version, defaults.version + 1);
+      assert.equal(publicSettings.notice, "Seating is limited this week.");
+      assert.deepEqual(
+        publicSettings.closures.map(
+          (closure: { date: string }) => closure.date,
+        ),
+        [closedDay, dayAt(20)],
+      );
+      const { reservationsEnabled, reservationSettings } = await get(
+        "guest-services/config",
+      ).then((result) => result.json());
+      assert.equal(reservationsEnabled, true);
+      assert.deepEqual(reservationSettings, publicSettings);
+      assert.deepEqual(
+        await post("reservations", priorRequest).then((result) =>
+          result.json(),
+        ),
+        original,
+      );
+
+      async function assertUnavailable(
+        result: globalThis.Response,
+        code: string,
+      ) {
+        assert.equal(result.status, 409);
+        assert.equal((await result.json()).code, code);
+      }
+      await assertUnavailable(
+        await post("reservations", {
+          ...priorRequest,
+          requestId: randomUUID(),
+        }),
+        "RESERVATION_DATE_CLOSED",
+      );
+      await assertUnavailable(
+        await post("reservations", {
+          ...priorRequest,
+          requestId: randomUUID(),
+          date: openDay,
+          time: "21:15",
+        }),
+        "RESERVATION_HOURS",
+      );
+      await assertUnavailable(
+        await post(
+          `auth/admin/reservations/${id}`,
+          { version: 1, action: "CONFIRM" },
+          managerCookie,
+        ),
+        "RESERVATION_DATE_CLOSED",
+      );
+      await assertUnavailable(
+        await post(
+          `auth/admin/reservations/${id}`,
+          { version: 1, action: "RESCHEDULE", date: openDay, time: "15:45" },
+          managerCookie,
+        ),
+        "RESERVATION_HOURS",
+      );
+
+      const pause = await post(
+        policyPath,
+        {
+          ...publicSettings,
+          expectedVersion: version,
+          paused: true,
+          notice: "Online requests resume tomorrow.",
+        },
+        managerCookie,
+      );
+      assert.equal(pause.status, 200);
+      const paused = await pause.json();
+      await assertUnavailable(
+        await post("reservations", {
+          ...priorRequest,
+          requestId: randomUUID(),
+          date: openDay,
+          time: "21:00",
+        }),
+        "RESERVATIONS_PAUSED",
+      );
+      const moved = await post(
+        `auth/admin/reservations/${id}`,
+        { version: 1, action: "RESCHEDULE", date: openDay, time: "16:00" },
+        managerCookie,
+      );
+      assert.equal(moved.status, 200);
+      assert.equal((await moved.json()).reservation.time, "16:00");
+      assert.equal(
+        (
+          await post(
+            policyPath,
+            { ...publicSettings, expectedVersion: paused.version },
+            managerCookie,
+          )
+        ).status,
+        200,
+      );
+      assert.equal(
+        (
+          await post("reservations", {
+            ...priorRequest,
+            requestId: randomUUID(),
+            date: openDay,
+            time: "21:00",
+          })
+        ).status,
+        201,
+      );
+      const recorded = await db.query(
+        "SELECT status,version FROM guest_reservations WHERE email=$1 ORDER BY reservation_number",
+        [guestEmail],
+      );
+      assert.deepEqual(recorded.rows, [
+        { status: "CONFIRMED", version: 2 },
+        { status: "REQUESTED", version: 1 },
+      ]);
+    } finally {
+      await app.close();
+      const cleanup = await db.connect();
+      try {
+        await cleanup.query("BEGIN");
+        await cleanup.query(
+          "UPDATE guest_reservation_settings SET version=$1,paused=$2,notice=$3,first_time=$4,last_time=$5,updated_at=$6,updated_by=$7 WHERE singleton",
+          [
+            baseline.version,
+            baseline.paused,
+            baseline.notice,
+            baseline.first_time,
+            baseline.last_time,
+            baseline.updated_at,
+            baseline.updated_by,
+          ],
+        );
+        await cleanup.query("DELETE FROM guest_reservation_closures");
+        for (const row of closedDates)
+          await cleanup.query(
+            "INSERT INTO guest_reservation_closures(closed_date,notice) VALUES ($1,$2)",
+            [row.closed_date, row.notice],
+          );
+        await cleanup.query(
+          "DELETE FROM notification_emails WHERE recipient=$1 OR reply_to=$1",
+          [guestEmail],
+        );
+        await cleanup.query("DELETE FROM guest_reservations WHERE email=$1", [
+          guestEmail,
+        ]);
+        await cleanup.query(
+          "DELETE FROM guest_submission_limits WHERE key_hash=ANY($1::text[])",
+          [
+            [
+              digest(`reservation:email:${guestEmail}`),
+              digest("reservation:ip:127.0.0.1"),
+            ],
+          ],
+        );
+        await cleanup.query(
+          "DELETE FROM customer_accounts WHERE email_normalized=$1",
+          [managerEmail],
+        );
+        await cleanup.query("COMMIT");
+      } catch (error) {
+        await cleanup.query("ROLLBACK");
+        throw error;
+      } finally {
+        cleanup.release();
+        await db.end();
+      }
+    }
+  },
+);

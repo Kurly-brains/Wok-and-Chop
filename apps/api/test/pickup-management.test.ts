@@ -43,6 +43,9 @@ test("manager pickup edits are versioned, reversible, private, and preserve auth
       return { ...basket, requestId, name: "Synthetic Guest", phone: "6135550108", email: guestEmail, expectedTotalCents: quote.totalCents, quoteFingerprint: quote.quoteFingerprint, expectedAccountId: null };
     }
     const request = body();
+    const summaryPath = "admin/deliveries/summary";
+    assert.equal((await get(summaryPath)).status, 401);
+    assert.equal((await get(summaryPath, customer.cookie)).status, 403);
     assert.equal((await post("admin/pickups", request)).status, 401);
     assert.equal((await post("admin/pickups", request, customer.cookie)).status, 403);
     assert.equal((await post("admin/pickups", request, manager.cookie, "https://untrusted.example.invalid")).status, 403);
@@ -51,6 +54,10 @@ test("manager pickup edits are versioned, reversible, private, and preserve auth
     const created = await post("admin/pickups", request, manager.cookie);
     assert.equal(created.status, 201);
     const receipt = await created.json();
+    const summary = await (await get(summaryPath, manager.cookie)).json();
+    assert.deepEqual(Object.keys(summary).sort(), ["activeCount", "newOrderIds"]);
+    assert.ok(summary.activeCount >= summary.newOrderIds.length);
+    assert.ok(summary.newOrderIds.includes(receipt.pickup.id));
     assert.equal(receipt.pickup.totalCents, quote.totalCents);
     assert.deepEqual(receipt.pickup.statusHistory.map((event: {status: string}) => event.status), ["RECEIVED"]);
     const row = (await db.query("SELECT customer_account_id,created_by_manager_id,snapshot FROM delivery_orders WHERE id=$1", [receipt.pickup.id])).rows[0];
@@ -93,6 +100,7 @@ test("manager pickup edits are versioned, reversible, private, and preserve auth
     assert.equal((await mutate("undo", { reason: "x".repeat(501) })).status, 400);
     assert.equal((await mutate("archive", { archived: "yes" })).status, 400);
     await update("note", { note: "  Internal follow-up\r\nSecond line\tfixture  " });
+    assert.ok(!(await (await get(summaryPath, manager.cookie)).json()).newOrderIds.includes(receipt.pickup.id));
     assert.equal(order.managerNote, "Internal follow-up\nSecond line\tfixture");
     assert.equal(order.version, 2);
     assert.equal(order.updatedAt, receipt.pickup.updatedAt);
@@ -115,6 +123,14 @@ test("manager pickup edits are versioned, reversible, private, and preserve auth
     assert.equal(order.auditHistory.at(-1).action, "UNDO");
     assert.equal(order.auditHistory.at(-1).reason, "Accidental cancellation\nGuest is collecting");
     assert.deepEqual(order.statusHistory.map((event: {status: string}) => event.status), ["RECEIVED", "CANCELLED", "RECEIVED"]);
+    await update("status", { status: "PREPARING" });
+    await update("status", { status: "READY_FOR_PICKUP" });
+    assert.equal((await mutate("status", { status: "RECEIVED" })).status, 409);
+    await update("status", { status: "PREPARING" });
+    await update("status", { status: "RECEIVED" });
+    assert.equal(order.status, "RECEIVED");
+    assert.equal(order.auditHistory.at(-1).status, "RECEIVED");
+    assert.ok(!(await (await get(summaryPath, manager.cookie)).json()).newOrderIds.includes(order.id));
     for (const status of ["PREPARING", "READY_FOR_PICKUP", "PICKED_UP"]) await update("status", { status });
     assert.equal(order.undoTargetStatus, "READY_FOR_PICKUP");
     const beforeArchive = await emailCount();
@@ -157,7 +173,7 @@ test("manager pickup edits are versioned, reversible, private, and preserve auth
     await assert.rejects(db.query("UPDATE delivery_orders SET snapshot='{}'::jsonb WHERE id=$1", [order.id]), /immutable/);
     const notices = (await db.query("SELECT body,status FROM notification_emails WHERE recipient=$1", [guestEmail])).rows;
     assert.ok(notices.every(notice => notice.status === "PREVIEW"));
-    assert.equal(notices.filter(notice => notice.body.startsWith("The restaurant corrected your pickup status.")).length, 2);
+    assert.equal(notices.filter(notice => notice.body.startsWith("The restaurant corrected your pickup status.")).length, 4);
     assert.ok(notices.every(notice => !notice.body.includes("Completed record") && !notice.body.includes(receipt.trackingToken)));
     const events = (await db.query("SELECT action,version,manager_id FROM delivery_order_events WHERE order_id=$1 ORDER BY version", [order.id])).rows;
     assert.equal(events.length, order.version);

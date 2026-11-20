@@ -1,27 +1,22 @@
 .reservation-calendar {
-  --reservation-calendar-ink: #352822;
-  --reservation-calendar-red: #861c17;
-  --reservation-calendar-paper: #fdfaf6;
+  --reservation-calendar-ink: #292422;
+  --reservation-calendar-red: var(--red-dark, #861c17);
+  --reservation-calendar-line: #e7e0de;
   min-width: 0;
-  padding: clamp(6px, 1.2vw, 12px);
-  border: 1px solid #d8c6ba;
-  background: var(--reservation-calendar-paper);
   color: var(--reservation-calendar-ink);
   font-family: var(--body, Arial, sans-serif);
 }
 
 .reservation-calendar-header {
   display: grid;
-  grid-template-columns: 42px minmax(0, 1fr) 42px;
+  grid-template-columns: 44px minmax(0, 1fr) 44px;
   align-items: center;
   gap: 5px;
-  padding-bottom: 5px;
-  border-bottom: 1px solid #e5d8cd;
 }
 
 .reservation-calendar-header strong {
-  color: var(--reservation-calendar-red);
-  font: 400 clamp(20px, 2.6vw, 29px)/1.18 var(--serif, Georgia, serif);
+  color: var(--reservation-calendar-ink);
+  font: 700 clamp(16px, 2vw, 20px)/1.18 var(--body, Arial, sans-serif);
   text-align: center;
 }
 
@@ -31,16 +26,16 @@
   min-width: 0;
   width: 100%;
   border: 1px solid transparent;
-  border-radius: 0;
+  border-radius: 50%;
   background: transparent;
   color: inherit;
   font: inherit;
   cursor: pointer;
+  transition: background-color .18s ease, color .18s ease;
 }
 
 .reservation-calendar-header button {
-  min-height: 42px;
-  border-color: #d8c6ba;
+  min-height: 44px;
   color: var(--reservation-calendar-red);
   font-family: Arial, sans-serif;
   font-size: 1.65rem;
@@ -55,13 +50,12 @@
 }
 
 .reservation-calendar button:not(:disabled):not([aria-disabled="true"]):hover {
-  border-color: #b77565;
-  background-color: #f8e9e1;
+  background-color: #fbf2f1;
 }
 
 .reservation-calendar-header button[aria-disabled="true"],
 .reservation-calendar td button:disabled {
-  color: #a3958c;
+  color: #897f7a;
   cursor: default;
 }
 
@@ -69,21 +63,24 @@
   table-layout: fixed;
   width: 100%;
   border-collapse: separate;
-  border-spacing: 2px;
-  margin-top: 6px;
+  border-spacing: 3px;
+  margin-top: 4px;
 }
 
 .reservation-calendar th {
-  padding: 5px 0 3px;
-  color: #705b50;
+  padding: 6px 0;
+  color: #645b57;
   font-size: .6875rem;
   font-weight: 650;
   text-align: center;
 }
 
-.reservation-calendar td { height: 40px; padding: 0; }
+.reservation-calendar td { height: clamp(38px, 5.2vw, 49px); padding: 0; }
 .reservation-calendar td button {
-  min-height: 40px;
+  margin-inline: auto;
+  width: min(100%, 45px);
+  aspect-ratio: 1;
+  min-height: 32px;
   font-size: .875rem;
   font-variant-numeric: tabular-nums;
 }
@@ -95,6 +92,27 @@
   color: white;
   font-weight: 700;
 }
+.reservation-calendar td[aria-selected="true"] button { animation: reservation-date-selected .22s ease-out both; }
+
+.reservation-calendar td button[data-closed="true"] {
+  background: #faeeed;
+  color: #804949;
+  text-decoration: line-through;
+  cursor: default;
+}
+
+.reservation-calendar-closures {
+  margin-block-start: 8px;
+  padding: 10px 0 0;
+  border-block-start: 1px solid var(--reservation-calendar-line);
+  font-size: .8125rem;
+  line-height: 1.45;
+}
+.reservation-calendar-closures > strong { color: var(--reservation-calendar-red); }
+.reservation-calendar-closures ul { display: grid; gap: 5px; margin: 6px 0 0; padding: 0; list-style: none; }
+.reservation-calendar-closures li { display: grid; grid-template-columns: minmax(46px, auto) minmax(0, 1fr); gap: 8px; }
+.reservation-calendar-closures time { font-weight: 650; }
+.reservation-calendar-closures li span { overflow-wrap: anywhere; white-space: pre-wrap; }
 
 .reservation-calendar-advice {
   position: absolute;
@@ -108,6 +126,16 @@
 
 @media (max-width: 430px) {
   .reservation-calendar th { font-size: .625rem; }
-  .reservation-calendar td { height: 36px; }
-  .reservation-calendar td button { min-height: 36px; }
+  .reservation-calendar td { height: 37px; }
+  .reservation-calendar table { border-spacing: 2px; }
+}
+
+@keyframes reservation-date-selected {
+  from { scale: .9; }
+  to { scale: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .reservation-calendar button { transition: none; }
+  .reservation-calendar td[aria-selected="true"] button { animation: none; }
 }

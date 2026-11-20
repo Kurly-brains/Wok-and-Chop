@@ -72,9 +72,15 @@ The direct pickup flow stores test orders and their status changes in PostgreSQL
 
 Every staff and kitchen page checks the current manager session before it renders. The public footer links to staff sign-in. The workspace sidebar appears after manager sign-in.
 
+The Order desk badge shows the active direct-order count. While a staff page is open, the badge refreshes every five seconds and new incoming tickets trigger an alert. In the kitchen, staff can drag a ticket to an adjacent stage or use its action buttons. Moving a pickup back asks for confirmation and records the correction on the order.
+
 ### Table requests, contact messages and email
 
 Guests can ask for a table on `/order/#book-a-table` or fill out the message form on `/contact/`. Requests use Toronto time and await a staff decision. In `/staff/reservations/`, managers can confirm, change the date, time and party size, decline, or cancel a booking. The contact inbox keeps a record of each submission. The local API accepts form submissions. The hosted preview displays the forms with submission disabled.
+
+In **Reservations → Booking settings**, managers can set the daily first and last request times, pause online requests, and close individual dates with guest notices. Review booked tables before closing a date. Existing bookings can be rescheduled or cancelled individually.
+
+In **Menu editor → Guest options for this dish**, managers can set or reset the price of each enabled choice. Published prices update the dish and the server's pickup quote, including when an option costs $0.
 
 The local API sends from `info@wokandchop.ca` through `smtp.hostinger.com` on port `465` with TLS. To enable real sending, create the ignored `ops/.env` from `ops/.env.example`, set `WOK_SMTP_PASSWORD` to the Hostinger mailbox password and restart the local API. Staff receive new reservation, contact and pickup alerts at `wokandchopottawa@gmail.com`. Guests receive booking acknowledgments and decisions, optional pickup status emails, and ten-minute one-time password-reset codes. [Hostinger email configuration](https://www.hostinger.com/support/1575756-how-to-get-email-account-configuration-details-for-hostinger-email/)
 

@@ -5,15 +5,17 @@ import type { MenuItem, ModifierGroup } from "./types";
 export type MenuCatalogItem = MenuItem & {
   imagePresentation?: "photo" | "cutout";
   modifierGroupIds?: readonly string[];
+  modifierPriceOverrides?: Readonly<Record<string, number>>;
 };
 export type CatalogMenuItem = MenuCatalogItem;
 export type MenuItemPatch = Partial<
-  Pick<MenuCatalogItem, "name" | "description" | "categoryId" | "priceCents" | "available" | "archived" | "imagePresentation" | "vegetarian" | "spicy" | "heatLevel" | "containsPeanuts" | "featured" | "modifierGroupIds">
+  Pick<MenuCatalogItem, "name" | "description" | "categoryId" | "priceCents" | "available" | "archived" | "imagePresentation" | "vegetarian" | "spicy" | "heatLevel" | "containsPeanuts" | "featured" | "modifierGroupIds" | "modifierPriceOverrides">
 > & { image?: string | null };
 export type NewMenuItem = MenuItemPatch & Required<Pick<MenuItemPatch, "name" | "categoryId" | "priceCents">>;
 
 export const MAX_MENU_IMAGE_BYTES = 500_000;
 export const MAX_MENU_STORAGE_BYTES = 2_500_000;
+export const MAX_MODIFIER_PRICE_CENTS = 100_000;
 const defaultImages: Record<string, Pick<MenuCatalogItem, "image" | "imagePresentation">> = {
   "chilli-chicken": { image: "/images/chicken-cutout.webp", imagePresentation: "cutout" },
   "hakka-noodles": { image: "/images/hakka-table.jpg", imagePresentation: "photo" },
@@ -38,8 +40,10 @@ export const defaultCatalog: readonly MenuCatalogItem[] = Object.freeze(
   [...menuItems, ...lunchMenuItems].map((item) => Object.freeze({ ...item, ...defaultImages[item.id], fixture: true as const })),
 );
 const categoryIds = new Set([...categories, ...lunchCategories].filter((category) => category.id !== "all").map((category) => category.id));
-const allowedFields = new Set(["name", "description", "categoryId", "priceCents", "available", "archived", "image", "imagePresentation", "vegetarian", "spicy", "heatLevel", "containsPeanuts", "featured", "modifierGroupIds"]);
-const knownModifierGroupIds = new Set(defaultCatalog.flatMap(item => item.modifierGroups?.map(group => group.id) ?? []));
+const allowedFields = new Set(["name", "description", "categoryId", "priceCents", "available", "archived", "image", "imagePresentation", "vegetarian", "spicy", "heatLevel", "containsPeanuts", "featured", "modifierGroupIds", "modifierPriceOverrides"]);
+const knownModifierGroups = defaultCatalog.flatMap(item => item.modifierGroups ?? []);
+const knownModifierGroupIds = new Set(knownModifierGroups.map(group => group.id));
+const knownModifierOptionIds = new Set(knownModifierGroups.flatMap(group => group.options.map(option => option.id)));
 export type Overrides = Record<string, MenuItemPatch>;
 
 /** Omit id when authoring a new dish; packaged dishes retain their source choice groups. */
@@ -53,12 +57,39 @@ export function availableDishModifierGroups(item: { id?: string; categoryId: str
     : [lunchSideGroup, lunchSoupOrPopGroup, lunchPreparationGroup];
 }
 
-function selectedGroupIds(item: { id?: string; categoryId: string }, selected?: readonly string[]) {
-  if (selected === undefined) return undefined;
-  if (!Array.isArray(selected) || new Set(selected).size !== selected.length) throw new Error("Choose each supported menu choice group at most once.");
+function chosenModifierGroups(item: { id?: string; categoryId: string; modifierGroupIds?: readonly string[] }) {
   const available = availableDishModifierGroups(item);
+  const selected = item.modifierGroupIds;
+  if (selected === undefined) return { groups: available };
+  if (!Array.isArray(selected) || new Set(selected).size !== selected.length) throw new Error("Choose each supported menu choice group at most once.");
   if (selected.some(id => !available.some(group => group.id === id))) throw new Error("One or more selected choice groups do not apply to this dish. Review its choices after changing category.");
-  return Object.freeze(available.filter(group => selected.includes(group.id)).map(group => group.id));
+  const groups = available.filter(group => selected.includes(group.id));
+  return { groups, ids: Object.freeze(groups.map(group => group.id)) };
+}
+
+function validateModifierPrices(value: unknown): Readonly<Record<string, number>> {
+  if (!value || typeof value !== "object" || Array.isArray(value) || ![null, Object.prototype].includes(Object.getPrototypeOf(value))) {
+    throw new Error("Enter modifier prices in CAD.");
+  }
+  const entries = Object.entries(value);
+  if (entries.length > knownModifierOptionIds.size || entries.some(([id]) => !knownModifierOptionIds.has(id))) {
+    throw new Error("One or more modifier prices do not apply to a known menu option.");
+  }
+  for (const [, price] of entries) {
+    if (typeof price !== "number" || !Number.isSafeInteger(price) || price < 0 || price > MAX_MODIFIER_PRICE_CENTS) {
+      throw new Error("Modifier prices must be whole CAD cents between 0 and 100,000 ($1,000).");
+    }
+  }
+  // Canonical order keeps equivalent create requests idempotent even if their keys arrive in a different order.
+  return Object.freeze(Object.fromEntries(entries.sort(([left], [right]) => left.localeCompare(right))));
+}
+
+function applicableModifierPrices(groups: readonly ModifierGroup[], prices: Readonly<Record<string, number>>, discardUnavailable = false) {
+  const optionIds = new Set(groups.flatMap(group => group.options.filter(option => option.available !== false).map(option => option.id)));
+  const active = Object.entries(prices).filter(([id]) => optionIds.has(id));
+  if (active.length === Object.keys(prices).length) return prices;
+  if (!discardUnavailable) throw new Error("Set prices only for enabled options on this dish.");
+  return Object.freeze(Object.fromEntries(active));
 }
 
 const stockLunchDescriptions = new Set([
@@ -69,13 +100,17 @@ const stockLunchDescriptions = new Set([
 ]);
 
 function withDishChoices(item: MenuCatalogItem): MenuCatalogItem {
-  const ids = selectedGroupIds(item, item.modifierGroupIds);
-  const groups = availableDishModifierGroups(item);
-  const chosen = ids === undefined ? groups : groups.filter(group => ids.includes(group.id));
+  const { groups, ids } = chosenModifierGroups(item);
+  const prices = item.modifierPriceOverrides && applicableModifierPrices(groups, item.modifierPriceOverrides);
+  const chosen = prices && Object.keys(prices).length ? groups.map(group => Object.freeze({
+    ...group, options: Object.freeze(group.options.map(option => Object.hasOwn(prices, option.id)
+      ? Object.freeze({ ...option, priceCents: prices[option.id] })
+      : option)),
+  })) : groups;
   let description = item.description;
   if (lunchMenuItems.some(candidate => candidate.id === item.id) && stockLunchDescriptions.has(description)) {
-    const rice = chosen.some(group => group.id === "lunch-side");
-    const soup = chosen.some(group => group.id === "lunch-soup-or-pop");
+    const rice = chosen.some(group => group.id === "lunch-side" && group.options.some(option => option.id === "lunch-jasmine-rice" && option.priceCents === 0));
+    const soup = chosen.some(group => group.id === "lunch-soup-or-pop" && group.options.every(option => option.priceCents === 0));
     description = rice && soup ? "Includes jasmine rice, a vegetable spring roll, and soup of the day or pop."
       : rice ? "Includes jasmine rice and a vegetable spring roll."
         : soup ? "Includes a vegetable spring roll and soup of the day or pop."
@@ -159,6 +194,9 @@ export function validatePatch(value: unknown): MenuItemPatch {
         }
         patch.modifierGroupIds = Object.freeze([...field]);
         break;
+      case "modifierPriceOverrides":
+        patch.modifierPriceOverrides = validateModifierPrices(field);
+        break;
     }
   }
   if (patch.heatLevel !== undefined) patch.spicy = patch.heatLevel > 0;
@@ -170,7 +208,11 @@ export function validateNewMenuItem(value: unknown): NewMenuItem {
   if (!patch.name || patch.priceCents === undefined || patch.priceCents < 1 || !lunchCategories.some(category => category.id === patch.categoryId)) {
     throw new Error("Enter a dish name, a lunch category and a positive price.");
   }
-  if (patch.modifierGroupIds !== undefined) patch.modifierGroupIds = selectedGroupIds({ categoryId: patch.categoryId! }, patch.modifierGroupIds);
+  if (patch.modifierGroupIds !== undefined || patch.modifierPriceOverrides !== undefined) {
+    const { groups, ids } = chosenModifierGroups({ categoryId: patch.categoryId!, modifierGroupIds: patch.modifierGroupIds });
+    if (ids !== undefined) patch.modifierGroupIds = ids;
+    if (patch.modifierPriceOverrides !== undefined) patch.modifierPriceOverrides = applicableModifierPrices(groups, patch.modifierPriceOverrides);
+  }
   return patch as NewMenuItem;
 }
 
@@ -193,6 +235,9 @@ export function applyMenuItemPatch(item: MenuCatalogItem, patch: MenuItemPatch):
   const next: MenuCatalogItem = { ...item, ...fields, fixture: true };
   if (image === null) delete next.image;
   else if (image !== undefined) next.image = image;
+  if (patch.modifierPriceOverrides === undefined && next.modifierPriceOverrides !== undefined) {
+    next.modifierPriceOverrides = applicableModifierPrices(chosenModifierGroups(next).groups, next.modifierPriceOverrides, true);
+  }
   if (customLunchId.test(item.id)) {
     const { id, ...editable } = next;
     delete editable.modifierGroups;

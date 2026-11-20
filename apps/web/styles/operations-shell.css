@@ -10,6 +10,17 @@
   font-family: var(--body, Arial, sans-serif);
 }
 
+.ops-admin.ops-admin--workspace {
+  --ops-ink: #292321;
+  --ops-muted: #675b55;
+  --ops-line: #e9dfd7;
+  --ops-paper: #f7f3ee;
+  --ops-action: #a60007;
+  --ops-action-hover: #81070a;
+  --ops-selected: #f7e9e6;
+  background: #fff;
+}
+
 .ops-admin-masthead {
   display: flex;
   align-items: center;
@@ -57,7 +68,6 @@
 }
 
 .ops-admin--workspace .ops-admin-masthead {
-  border-top: 3px solid var(--ops-red);
   border-bottom: 1px solid var(--ops-line);
   background: #fff;
   color: var(--ops-ink);
@@ -69,11 +79,11 @@
 }
 
 .ops-admin--workspace a.ops-admin-site-link {
-  color: var(--ops-red);
+  color: var(--ops-action);
 }
 
 .ops-admin--workspace .ops-admin-masthead :focus-visible {
-  outline-color: var(--ops-red);
+  outline-color: var(--ops-action);
 }
 
 .ops-admin-frame {
@@ -94,7 +104,7 @@
   top: 14px;
   display: grid;
   gap: 25px;
-  padding: 24px 11px;
+  padding: 24px 13px;
 }
 
 .ops-admin-nav-group {
@@ -118,7 +128,8 @@
   align-items: center;
   min-height: 44px;
   padding: 7px 9px;
-  border-inline-start: 2px solid transparent;
+  gap: 0.65rem;
+  border-radius: 0.5rem;
   font-size: 0.875rem;
   font-weight: 600;
   text-decoration: none;
@@ -127,13 +138,253 @@
 
 .ops-admin-nav-group a:hover {
   background: #fff;
-  color: var(--ops-red);
+  color: var(--ops-action);
 }
 .ops-admin-nav-group a[aria-current="page"] {
-  border-color: var(--ops-red);
-  background: var(--red-soft, #f7e9e8);
-  color: var(--ops-red);
+  background: var(--ops-selected);
+  color: var(--ops-action);
   font-weight: 750;
+}
+
+.ops-admin--workspace .ops-admin-content main h1 {
+  color: var(--ops-ink);
+  font: 740 clamp(1.85rem, 4vw, 3rem) / 1.07 var(--body, Arial, sans-serif);
+  letter-spacing: -0.045em;
+}
+
+.ops-admin--workspace
+  .ops-admin-content
+  :is(.staff-marketing, .delivery-main, .guest-desk, .printer-guide)
+  h2 {
+  font-family: var(--body, Arial, sans-serif);
+  font-weight: 700;
+  letter-spacing: -0.022em;
+}
+
+.ops-admin--workspace .ops-admin-content .ops-button:not(.ops-button-outline) {
+  border-color: var(--ops-action);
+  border-radius: 0.45rem;
+  background: var(--ops-action);
+  color: #fff;
+}
+
+.ops-admin--workspace
+  .ops-admin-content
+  .ops-button:not(.ops-button-outline):hover {
+  border-color: var(--ops-action-hover);
+  background: var(--ops-action-hover);
+}
+
+.ops-admin--workspace .ops-admin-content .ops-button-outline {
+  border-radius: 0.45rem;
+}
+
+.ops-admin--workspace .ops-admin-content .delivery-detail {
+  border: 0;
+  border-inline-start: 1px solid var(--ops-line);
+  background: transparent;
+}
+
+.ops-admin--workspace .delivery-main-head {
+  border-bottom: 1px solid var(--ops-line);
+}
+
+.ops-admin--workspace .deliveries-list {
+  padding: 0;
+  border: 0;
+  background: transparent;
+}
+
+.ops-admin--workspace .delivery-desk-heading h2 {
+  font-size: clamp(1.15rem, 2.4vw, 1.65rem);
+}
+
+.ops-admin--workspace .delivery-search {
+  border: 1px solid transparent;
+  border-radius: 1.5rem;
+  background: var(--ops-paper);
+}
+
+.ops-admin--workspace .delivery-search:focus-within {
+  border-color: var(--ops-action);
+}
+
+.ops-admin--workspace
+  :is(.delivery-stage-filters, .guest-desk-scopes, .menu-editor-archive-tabs)
+  button {
+  padding-inline: 0.84rem;
+  border: 1px solid transparent;
+  border-radius: 1.5rem;
+  background: var(--ops-paper);
+  color: var(--ops-muted);
+}
+
+.ops-admin--workspace
+  :is(.delivery-stage-filters, .guest-desk-scopes, .menu-editor-archive-tabs)
+  button[aria-pressed="true"] {
+  border-color: transparent;
+  background: var(--ops-selected);
+  color: var(--ops-action);
+}
+
+.ops-admin--workspace :is(.delivery-stage, .guest-desk-badge) {
+  padding-inline: 0.64rem;
+  border: 0;
+  border-radius: 1rem;
+}
+
+.ops-admin--workspace .delivery-row-ref strong {
+  font: 700 1rem/1.2 var(--body, Arial, sans-serif);
+  font-variant-numeric: tabular-nums;
+}
+
+.ops-admin--workspace :is(.delivery-list-rows, .guest-desk-rows) button:hover {
+  background: var(--ops-paper);
+}
+
+.ops-admin--workspace
+  :is(.delivery-list-rows, .guest-desk-rows)
+  button[aria-pressed="true"] {
+  background: var(--ops-selected);
+  box-shadow: inset 3px 0 var(--ops-action);
+}
+
+.ops-admin--workspace .guest-desk-detail {
+  padding-block-start: 0.2rem;
+  border: 0;
+  border-inline-start: 1px solid var(--ops-line);
+  background: transparent;
+}
+
+.ops-admin--workspace .staff-marketing-envelope {
+  border: 0;
+  border-radius: 0.65rem;
+  background: var(--ops-paper);
+}
+
+.ops-admin--workspace .delivery-kitchen-ticket {
+  border: 0;
+  border-bottom: 1px solid var(--ops-line);
+  background: var(--ops-paper);
+}
+
+.ops-admin--workspace .delivery-station > header {
+  min-height: 3.35rem;
+  border-radius: 0.45rem 0.45rem 0 0;
+}
+
+.ops-admin--workspace .delivery-station > header h2 {
+  font-size: clamp(1rem, 2vw, 1.25rem);
+}
+
+.ops-admin--workspace .delivery-kitchen-ticket {
+  border-radius: 0.45rem;
+}
+
+.ops-admin--workspace .delivery-mode button[aria-pressed="true"],
+.ops-admin--workspace .guest-desk-tabs [aria-pressed="true"] {
+  border-color: var(--ops-action);
+  color: var(--ops-action);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .ops-admin--workspace
+    :is(
+      .ops-admin-nav a,
+      .delivery-list-rows button,
+      .guest-desk-rows button,
+      .delivery-stage-filters button,
+      .delivery-mode button
+    ) {
+    transition:
+      background-color 180ms ease,
+      border-color 180ms ease,
+      color 180ms ease;
+  }
+
+  .ops-admin--workspace
+    :is(
+      .ops-admin-content main,
+      .delivery-ticket-detail,
+      .delivery-kitchen-ticket,
+      .ops-admin-order-alert,
+      .wc-booking-settings
+    ) {
+    animation: staff-content-appear 210ms ease-out;
+  }
+}
+
+@keyframes staff-content-appear {
+  from {
+    opacity: 0;
+    translate: 0 5px;
+  }
+  to {
+    opacity: 1;
+    translate: 0 0;
+  }
+}
+
+.ops-admin-order-count {
+  flex-shrink: 0;
+  margin-inline-start: auto;
+  padding: 0.18rem 0.5rem;
+  border-radius: 1rem;
+  background: var(--ops-red);
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 750;
+  line-height: 1.25;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.ops-admin-order-count[data-empty="true"] {
+  background: #eae3de;
+  color: var(--ops-muted);
+}
+
+.ops-admin-order-announcement {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.ops-admin-order-alert {
+  position: fixed;
+  z-index: 40;
+  inset: auto 1rem calc(1rem + env(safe-area-inset-bottom)) auto;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.25rem 0.9rem;
+  max-width: calc(100% - 2rem);
+  padding: 0.45rem 0.5rem 0.45rem 0.9rem;
+  border: 1px solid #e0cec5;
+  border-inline-start: 4px solid var(--ops-red);
+  background: #fff8f2;
+  color: var(--ops-ink);
+  box-shadow: 0 8px 20px #38230d1c;
+  font-size: 0.875rem;
+}
+
+.ops-admin-order-alert a {
+  color: var(--ops-red);
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 0.18em;
+}
+
+.ops-admin-order-alert button {
+  min-width: 44px;
+  min-height: 44px;
+  border: 0;
+  background: transparent;
+  color: var(--ops-muted);
+  font-size: 1.25rem;
 }
 
 .ops-admin-mobile-toggle {
@@ -178,10 +429,15 @@
     padding: 10px 20px;
     border: 0;
     background: transparent;
-    color: var(--ops-red);
+    color: var(--ops-action);
     font-size: 0.875rem;
     font-weight: 750;
     text-align: start;
+  }
+  .ops-admin-mobile-meta {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
   }
   .ops-admin-menu-icon {
     width: 9px;
@@ -206,6 +462,13 @@
   }
   .ops-admin-nav[data-open="false"] {
     display: none;
+  }
+  .ops-admin--workspace
+    .ops-admin-content
+    :is(.delivery-detail, .guest-desk-detail) {
+    border-inline-start: 0;
+    border-top: 1px solid var(--ops-line);
+    padding: 1.1rem 0 0;
   }
 }
 

@@ -16,6 +16,28 @@ import ReservationCalendar from "./reservation-calendar";
 import "../styles/guest-contact-forms.css";
 
 type ContactReceipt = { number: string; status: "RECEIVED" };
+const torontoClock = new Intl.DateTimeFormat("en-CA", {
+  timeZone: "America/Toronto", hourCycle: "h23", year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit",
+});
+const bookingTimeGroups = [{ label: "Morning", start: 0, end: 12 }, { label: "Afternoon", start: 12, end: 17 }, { label: "Evening", start: 17, end: 24 }];
+const dayMilliseconds = 86_400_000;
+
+function wallClock(instant: number) {
+  const parts = Object.fromEntries(torontoClock.formatToParts(instant).map(part => [part.type, part.value]));
+  return `${parts.year}-${parts.month}-${parts.day}T${parts.hour}:${parts.minute}`;
+}
+
+function bookableTimes<T extends { value: string }>(date: string, hours: T[], cutoff: number) {
+  const midnight = Date.parse(`${date}T00:00:00Z`);
+  const offsets = new Set([midnight - dayMilliseconds, midnight + dayMilliseconds].map(instant => Date.parse(`${wallClock(instant)}Z`) - instant));
+  return hours.filter(({ value }) => {
+    const local = `${date}T${value}`;
+    const wallTime = Date.parse(`${local}Z`);
+    // On daylight saving transitions some local times occur twice or do not occur at all.
+    const instants = Array.from(offsets, offset => wallTime - offset).filter(instant => wallClock(instant) === local);
+    return instants.length === 1 && instants[0] >= cutoff;
+  });
+}
 
 function useGuestSubmission<Receipt>(path: string, getReceipt: (response: unknown) => Receipt | undefined) {
   const submission = useRef<{ payload: string; id: string } | null>(null);
@@ -112,29 +134,58 @@ function PhoneField({ required = false }: { required?: boolean }) {
 
 function ReservationRequest({ config, availability }: { config: Partial<GuestServiceConfig>; availability: "checking" | "ready" | "closed" }) {
   const { send, reset, busy, error, receipt } = useGuestSubmission("reservations", reservationReceipt);
-  const [date, setDate] = useState("");
+  const [preferredDate, setPreferredDate] = useState("");
+  const [preferredTime, setPreferredTime] = useState("");
   const [dateError, setDateError] = useState(false);
+  const [now, setNow] = useState(() => Date.now());
+  useEffect(() => {
+    const update = () => setNow(Date.now());
+    const timer = window.setInterval(update, 30_000);
+    window.addEventListener("focus", update);
+    return () => {
+      window.clearInterval(timer);
+      window.removeEventListener("focus", update);
+    };
+  }, []);
   const { earliest, latest } = bookingDateRange(config);
+  const settings = config.reservationSettings;
+  const paused = settings?.paused === true;
+  const lead = config.minLeadMinutes ?? 60;
   const maxPartySize = config.maxPartySize ?? 20;
   const step = config.timeStepMinutes ?? 15;
-  const times = Array.from({ length: 1440 / step }, (_, index) => {
+  const hours = Array.from({ length: 1440 / step }, (_, index) => {
     const minutes = index * step;
     const hour = Math.floor(minutes / 60);
     const minute = minutes % 60;
     return { value: `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`, label: `${hour % 12 || 12}:${String(minute).padStart(2, "0")} ${hour < 12 ? "a.m." : "p.m."}`, hour };
-  });
+  }).filter(time => time.value >= (settings?.firstTime ?? "00:00") && time.value <= (settings?.lastTime ?? "23:45"));
+  const cutoff = now + lead * 60_000;
+  const firstDayTimes = bookableTimes(earliest, hours, cutoff);
+  const nextDay = new Date(Date.parse(`${earliest}T00:00:00Z`) + dayMilliseconds).toISOString().slice(0, 10);
+  const firstBookableDate = firstDayTimes.length ? earliest : nextDay;
+  const min = firstBookableDate > latest ? latest : firstBookableDate;
+  const date = preferredDate >= firstBookableDate && preferredDate <= latest && !settings?.closures.some(closure => closure.date === preferredDate) ? preferredDate : "";
+  const times = date && date !== earliest ? bookableTimes(date, hours, cutoff) : firstDayTimes;
+  const time = date && times.some(entry => entry.value === preferredTime) ? preferredTime : "";
+  const canBook = availability === "ready" && !paused && hours.length > 0 && firstBookableDate <= latest;
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (availability !== "ready") return;
+    if (!canBook) return;
     if (!date) { setDateError(true); return; }
+    if (!time) return;
+    const submittedAt = Date.now();
+    if (!bookableTimes(date, [{ value: time }], submittedAt + lead * 60_000).length) {
+      setNow(submittedAt);
+      return;
+    }
     const data = new FormData(event.currentTarget);
     await send({
       name: field(data, "name"),
       email: field(data, "email"),
       phone: field(data, "phone"),
       date,
-      time: field(data, "time"),
+      time,
       partySize: Number(field(data, "partySize")),
       notes: field(data, "notes"),
     });
@@ -151,25 +202,36 @@ function ReservationRequest({ config, availability }: { config: Partial<GuestSer
   );
 
   return (
-    <form className="guest-contact-form guest-booking-form" onSubmit={submit}>
-      <fieldset className="guest-booking-layout" disabled={busy}>
+    <form className="guest-contact-form guest-booking-form" data-paused={paused || undefined} onSubmit={submit}>
+      {(paused || settings?.notice) && <div className="guest-booking-notice" role="status">
+        {paused && <strong>Online reservations are paused.</strong>}
+        {settings?.notice && <p>{settings.notice}</p>}
+        {paused && <p><a href="tel:+16135911111">Call (613) 591-1111</a> for help with a reservation.</p>}
+      </div>}
+      <fieldset className="guest-booking-layout" disabled={busy || paused} hidden={paused}>
         <div className="guest-booking-date">
           <h3>Choose a date</h3>
-          <ReservationCalendar min={earliest} max={latest} value={date} onChange={value => { setDate(value); setDateError(false); }} />
+          <ReservationCalendar min={min} max={latest} value={date} closures={settings?.closures} onChange={value => {
+            if (value !== preferredDate) setPreferredTime("");
+            setPreferredDate(value);
+            setDateError(false);
+          }} />
           {dateError && <p className="guest-contact-error" role="alert">Choose a date on the calendar.</p>}
-          <p className="guest-contact-form-hint">Toronto time · Request at least {config.minLeadMinutes ?? 60} minutes ahead.</p>
+          {!dateError && preferredDate && !date && <p className="guest-contact-form-hint" role="status">That date is no longer available. Choose another day.</p>}
+          <p className="guest-contact-form-hint">Toronto time · Request at least {lead} minutes ahead.</p>
         </div>
         <div className="guest-booking-details">
           <h3>Reservation details</h3>
-          <div className="guest-contact-schedule">
+          <div className="guest-contact-schedule" data-date-selected={date ? "true" : undefined}>
           <label>Preferred time
-            <select name="time" key={date} defaultValue="" required>
-              <option value="" disabled>Choose a time</option>
-              {[["Morning", 0, 12], ["Afternoon", 12, 17], ["Evening", 17, 24]].map(([group, start, end]) => (
-                <optgroup key={group} label={String(group)}>
-                  {times.filter(time => time.hour >= Number(start) && time.hour < Number(end)).map(time => <option key={time.value} value={time.value}>{time.label}</option>)}
-                </optgroup>
-              ))}
+            <select key={date} name="time" value={time} onChange={event => setPreferredTime(event.target.value)} disabled={!date || !canBook || times.length === 0} required>
+              <option value="" disabled>{date ? "Choose a time" : "Choose a date first"}</option>
+              {date && bookingTimeGroups.map(group => {
+                const entries = times.filter(entry => entry.hour >= group.start && entry.hour < group.end);
+                return entries.length > 0 && <optgroup key={group.label} label={group.label}>
+                  {entries.map(entry => <option key={entry.value} value={entry.value}>{entry.label}</option>)}
+                </optgroup>;
+              })}
             </select>
           </label>
           <label>
@@ -182,6 +244,9 @@ function ReservationRequest({ config, availability }: { config: Partial<GuestSer
             </select>
           </label>
         </div>
+        {date && canBook && (times.length === 0 || (preferredTime && !time)) && <p className="guest-contact-form-hint" role="status">
+          {times.length === 0 ? "No times are available that day. Choose another date." : "That time is no longer available. Choose another time."}
+        </p>}
         <div className="guest-contact-fields">
           <label>Full name<input name="name" autoComplete="name" maxLength={80} required /></label>
           <label>Email address<input name="email" type="email" autoComplete="email" maxLength={254} required /></label>
@@ -193,7 +258,10 @@ function ReservationRequest({ config, availability }: { config: Partial<GuestSer
         </div>
           {availability !== "ready" && <p className="guest-contact-fallback" role="status">{availability === "checking" ? "Checking online booking…" : "Online booking is temporarily unavailable."}</p>}
           {error && <p className="guest-contact-error" role="alert">{error}</p>}
-          <button className="guest-contact-submit" type="submit" disabled={availability !== "ready"}>{busy ? "Sending request…" : "Request a table"} <span aria-hidden="true">→</span></button>
+          <div className="guest-booking-actions">
+            {date && time && <p className="guest-booking-selection" aria-live="polite">{formatReservationTime(date, time)} Toronto time</p>}
+            <button className="guest-contact-submit" type="submit" disabled={!canBook}>{busy ? "Sending request…" : "Request a table"} <span aria-hidden="true">→</span></button>
+          </div>
         </div>
       </fieldset>
     </form>
@@ -257,13 +325,23 @@ export default function GuestContactForms({ reservationOnly = false }: { reserva
   const [checked, setChecked] = useState(false);
 
   useEffect(() => {
-    const controller = new AbortController();
-    guestServiceRequest<GuestServiceConfig>("guest-services/config", { signal: controller.signal })
-      .then(result => { if (!controller.signal.aborted) setConfig(result); })
-      .catch(() => {})
-      .finally(() => { if (!controller.signal.aborted) setChecked(true); });
-    return () => controller.abort();
-  }, []);
+    let pending: AbortController | null = null;
+    function checkConfig() {
+      if (pending) return;
+      const controller = new AbortController();
+      pending = controller;
+      guestServiceRequest<GuestServiceConfig>("guest-services/config", { signal: controller.signal })
+        .then(result => { if (!controller.signal.aborted) setConfig(result); })
+        .catch(() => { if (!controller.signal.aborted) setConfig(null); })
+        .finally(() => { if (!controller.signal.aborted) { pending = null; setChecked(true); } });
+    }
+    checkConfig();
+    if (reservationOnly) window.addEventListener("focus", checkConfig);
+    return () => {
+      pending?.abort();
+      window.removeEventListener("focus", checkConfig);
+    };
+  }, [reservationOnly]);
 
   return (
     <div className={`guest-contact-forms${reservationOnly ? " guest-contact-forms--booking" : ""}`}>

@@ -13,6 +13,10 @@ import {
   Res,
 } from "@nestjs/common";
 import type { Pool, PoolClient } from "pg";
+import {
+  defaultReservationSettings,
+  type ReservationSettings,
+} from "../../../packages/domain/src/reservation-settings";
 import { AuthService } from "./auth";
 import {
   emailConfigured,
@@ -58,6 +62,13 @@ type ContactRow = {
 const UUID = /^[a-f\d]{8}(?:-[a-f\d]{4}){3}-[a-f\d]{12}$/i;
 const TIME_ZONE = "America/Toronto";
 const DAY = 86_400_000;
+const RESERVATION_TIME = /^(?:[01]\d|2[0-3]):(?:00|15|30|45)$/;
+type SettingsRow = Pick<
+  ReservationSettings,
+  "paused" | "notice" | "firstTime" | "lastTime"
+> & { version: number };
+type VersionedSettings = ReservationSettings & { version: number };
+const settingsColumns = `version, paused, notice, to_char(first_time,'HH24:MI') AS "firstTime", to_char(last_time,'HH24:MI') AS "lastTime"`;
 const reservationColumns = `r.*, to_char(r.reservation_date,'YYYY-MM-DD') AS date, to_char(r.reservation_time,'HH24:MI') AS time`;
 const localFormat = new Intl.DateTimeFormat("en-CA", {
   timeZone: TIME_ZONE,
@@ -144,7 +155,7 @@ export function torontoInstant(date: unknown, time: unknown): Date {
     typeof date !== "string" ||
     !/^20\d{2}-\d{2}-\d{2}$/.test(date) ||
     typeof time !== "string" ||
-    !/^(?:[01]\d|2[0-3]):(?:00|15|30|45)$/.test(time)
+    !RESERVATION_TIME.test(time)
   )
     fail(
       400,
@@ -228,6 +239,137 @@ async function transaction<T>(
     throw error;
   } finally {
     client.release();
+  }
+}
+
+function availabilityUpdate(body: unknown) {
+  const data = object(body, [
+    "expectedVersion",
+    "paused",
+    "notice",
+    "firstTime",
+    "lastTime",
+    "closures",
+  ]);
+  const { expectedVersion, paused, firstTime, lastTime, closures } = data;
+  if (
+    typeof expectedVersion !== "number" ||
+    !Number.isInteger(expectedVersion) ||
+    expectedVersion < 1 ||
+    expectedVersion >= 2_147_483_647
+  ) {
+    fail(
+      400,
+      "INVALID_VERSION",
+      "Reload the booking settings before saving them.",
+    );
+  }
+  if (typeof paused !== "boolean" || typeof data.notice !== "string") {
+    fail(
+      400,
+      "INVALID_INPUT",
+      "Choose whether bookings are paused and provide a notice or leave it blank.",
+    );
+  }
+  if (
+    typeof firstTime !== "string" ||
+    typeof lastTime !== "string" ||
+    !RESERVATION_TIME.test(firstTime) ||
+    !RESERVATION_TIME.test(lastTime) ||
+    firstTime > lastTime
+  ) {
+    fail(
+      400,
+      "INVALID_RESERVATION_HOURS",
+      "Choose first and last seating times on the same day in 15-minute increments.",
+    );
+  }
+  if (!Array.isArray(closures) || closures.length > 180) {
+    fail(400, "INVALID_CLOSURES", "Add at most 180 closed dates.");
+  }
+  const dates = new Map<string, string>();
+  for (const closure of closures) {
+    const { date, notice } = object(closure, ["date", "notice"]);
+    torontoInstant(date, "12:00");
+    const day = date as string;
+    if (dates.has(day))
+      fail(400, "DUPLICATE_CLOSURE", "List each closed date once.");
+    dates.set(day, text(notice, "Closed date notice", 280));
+  }
+  return {
+    expectedVersion,
+    paused,
+    firstTime,
+    lastTime,
+    notice: text(data.notice, "Booking notice", 280),
+    closures: [...dates]
+      .sort(([left], [right]) => left.localeCompare(right))
+      .map(([date, notice]) => ({ date, notice })),
+  };
+}
+
+async function readReservationSettings(db: Pick<Pool, "query">) {
+  const {
+    rows: [settings],
+  } = await db.query<VersionedSettings>(
+    `SELECT ${settingsColumns}, COALESCE((
+       SELECT jsonb_agg(jsonb_build_object('date',to_char(closed_date,'YYYY-MM-DD'),'notice',notice) ORDER BY closed_date)
+       FROM guest_reservation_closures
+     ), '[]'::jsonb) AS closures FROM guest_reservation_settings WHERE singleton`,
+  );
+  if (!settings)
+    fail(
+      503,
+      "RESERVATION_SETTINGS_UNAVAILABLE",
+      "Booking settings are temporarily unavailable.",
+    );
+  return settings;
+}
+
+async function checkReservationAvailability(
+  db: PoolClient,
+  date: string,
+  time: string,
+  guest: boolean,
+) {
+  const {
+    rows: [settings],
+  } = await db.query<SettingsRow>(
+    `SELECT ${settingsColumns} FROM guest_reservation_settings WHERE singleton FOR SHARE`,
+  );
+  if (!settings)
+    fail(
+      503,
+      "RESERVATION_SETTINGS_UNAVAILABLE",
+      "Booking settings are temporarily unavailable.",
+    );
+  if (guest && settings.paused)
+    fail(
+      409,
+      "RESERVATIONS_PAUSED",
+      settings.notice || "Online table requests are temporarily paused.",
+    );
+  // Hold the settings lock until the booking commits. A concurrent settings save
+  // cannot change closures or hours between this check and the reservation write.
+  const {
+    rows: [closure],
+  } = await db.query<{ notice: string }>(
+    "SELECT notice FROM guest_reservation_closures WHERE closed_date=$1",
+    [date],
+  );
+  if (closure)
+    fail(
+      409,
+      "RESERVATION_DATE_CLOSED",
+      closure.notice ||
+        "Table requests are closed on this date. Choose another date.",
+    );
+  if (time < settings.firstTime || time > settings.lastTime) {
+    fail(
+      409,
+      "RESERVATION_HOURS",
+      `Choose a seating time from ${settings.firstTime} to ${settings.lastTime} (Toronto time).`,
+    );
   }
 }
 async function submissionLimit(
@@ -316,19 +458,29 @@ export class GuestServicesController {
   @Get("guest-services/config")
   async config() {
     let ready = false;
+    let reservationsEnabled = false;
+    let reservationSettings = defaultReservationSettings;
     try {
+      const db = this.auth.database();
       const {
         rows: [row],
-      } = await this.auth.database()
-        .query(`SELECT to_regclass('public.guest_reservations') IS NOT NULL
+      } =
+        await db.query(`SELECT to_regclass('public.guest_reservations') IS NOT NULL
       AND to_regclass('public.guest_contact_messages') IS NOT NULL AND to_regclass('public.notification_emails') IS NOT NULL AS ready`);
       ready = Boolean(row.ready);
+      if (ready) {
+        const { paused, notice, firstTime, lastTime, closures } =
+          await readReservationSettings(db);
+        reservationSettings = { paused, notice, firstTime, lastTime, closures };
+        reservationsEnabled = true;
+      }
     } catch {
       /* The hosted/unconfigured preview stays closed. */
     }
     return {
       contactEnabled: ready,
-      reservationsEnabled: ready,
+      reservationsEnabled,
+      reservationSettings,
       emailEnabled: ready && emailConfigured(),
       mode: "LOCAL_PREVIEW",
       timeZone: TIME_ZONE,
@@ -456,6 +608,7 @@ export class GuestServicesController {
         return prior.rows[0];
       }
       future(startsAt);
+      await checkReservationAvailability(client, input.date, input.time, true);
       await submissionLimit(client, "reservation", input.email, request);
       const {
         rows: [saved],
@@ -502,6 +655,62 @@ export class GuestServicesController {
 export class ManagerGuestServicesController {
   private readonly attempts = new AttemptLimit();
   constructor(@Inject(AuthService) private readonly auth: AuthService) {}
+  @Get("reservations/settings")
+  async settings(
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    return readReservationSettings(
+      await this.auth.managerDatabase(request, response),
+    );
+  }
+  @Post("reservations/settings")
+  @HttpCode(200)
+  async updateSettings(
+    @Body() body: unknown,
+    @Req() request: Request,
+    @Res({ passthrough: true }) response: Response,
+  ) {
+    this.auth.checkOrigin(request);
+    const { pool, accountId } = await this.auth.managerAccess(
+      request,
+      response,
+    );
+    this.attempts.take(accountId, 120);
+    const changes = availabilityUpdate(body);
+    return transaction(pool, async (client) => {
+      const {
+        rows: [saved],
+      } = await client.query<SettingsRow>(
+        `UPDATE guest_reservation_settings SET paused=$2,notice=$3,first_time=$4,last_time=$5,
+           updated_by=$6, updated_at=now(), version=version+1
+         WHERE singleton AND version=$1 RETURNING ${settingsColumns}`,
+        [
+          changes.expectedVersion,
+          changes.paused,
+          changes.notice,
+          changes.firstTime,
+          changes.lastTime,
+          accountId,
+        ],
+      );
+      if (!saved)
+        fail(
+          409,
+          "VERSION_CONFLICT",
+          "Another staff member updated the booking settings. Reload before saving.",
+        );
+      await client.query("DELETE FROM guest_reservation_closures");
+      await client.query(
+        `INSERT INTO guest_reservation_closures(closed_date,notice) SELECT * FROM unnest($1::date[],$2::text[])`,
+        [
+          changes.closures.map((closure) => closure.date),
+          changes.closures.map((closure) => closure.notice),
+        ],
+      );
+      return { ...saved, closures: changes.closures };
+    });
+  }
   @Get("reservations")
   async list(
     @Req() request: Request,
@@ -539,18 +748,16 @@ export class ManagerGuestServicesController {
       [after ?? null],
     );
     return {
-      contacts: rows
-        .slice(0, 25)
-        .map((row) => ({
-          id: row.id,
-          number: `C-${row.message_number}`,
-          name: row.name,
-          email: row.email,
-          phone: row.phone,
-          subject: row.subject,
-          message: row.message,
-          createdAt: row.created_at,
-        })),
+      contacts: rows.slice(0, 25).map((row) => ({
+        id: row.id,
+        number: `C-${row.message_number}`,
+        name: row.name,
+        email: row.email,
+        phone: row.phone,
+        subject: row.subject,
+        message: row.message,
+        createdAt: row.created_at,
+      })),
       nextCursor: rows.length > 25 ? rows[24].id : null,
     };
   }
@@ -650,6 +857,9 @@ export class ManagerGuestServicesController {
         action === "RESCHEDULE" ? (data.date as string) : current.date;
       const time =
         action === "RESCHEDULE" ? (data.time as string) : current.time;
+      if (action === "CONFIRM" || action === "RESCHEDULE") {
+        await checkReservationAvailability(client, date, time, false);
+      }
       if (
         action === "RESCHEDULE" &&
         date === current.date &&

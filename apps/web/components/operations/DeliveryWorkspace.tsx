@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState, type DragEvent } from "react";
 import { formatMoney } from "@wok/domain";
 import { authRequest, useCustomer } from "../../lib/customer-session";
 import {
@@ -17,6 +17,8 @@ import "../../styles/delivery-operations.css";
 type Screen = "staff" | "kitchen";
 const pickupStages = ["RECEIVED", "PREPARING", "READY_FOR_PICKUP"] as const;
 const activeStages = [...pickupStages, "OUT_FOR_DELIVERY"] as const;
+type KitchenStage = (typeof activeStages)[number];
+const kitchenTicketType = "application/x-wok-kitchen-ticket";
 const kitchenNames = { RECEIVED: "Incoming", PREPARING: "Preparing", READY_FOR_PICKUP: "Ready for pickup", OUT_FOR_DELIVERY: "With driver" };
 const kitchenTiming = { RECEIVED: "Waiting", PREPARING: "In preparation", READY_FOR_PICKUP: "Ready", OUT_FOR_DELIVERY: "With driver" };
 const kitchenEmpty = { RECEIVED: "No tickets waiting.", PREPARING: "No tickets in preparation.", READY_FOR_PICKUP: "No orders waiting to be picked up.", OUT_FOR_DELIVERY: "No tickets with a driver." };
@@ -68,12 +70,11 @@ function Items({ order, prices }: { order: ManagerDelivery; prices?: boolean }) 
   </li>)}</ul>;
 }
 
-function Actions({ order, queue, kitchen = false }: { order: ManagerDelivery; queue: ManagerQueue; kitchen?: boolean }) {
+function Actions({ order, queue }: { order: ManagerDelivery; queue: ManagerQueue }) {
   const [cancel, setCancel] = useState(false);
   const action = nextOrderAction(order);
-  const waitingForHandoff = order.status === "OUT_FOR_DELIVERY" || order.status === "READY_FOR_PICKUP";
-  const canCancel = !kitchen && (order.status === "RECEIVED" || order.status === "PREPARING" || order.status === "READY_FOR_PICKUP");
-  if (!action || (kitchen && waitingForHandoff)) return null;
+  const canCancel = order.status === "RECEIVED" || order.status === "PREPARING" || order.status === "READY_FOR_PICKUP";
+  if (!action) return null;
   if (cancel && canCancel) return <div className="delivery-confirm" role="group" aria-label="Confirm cancellation">
     <strong>Cancel {order.number}?</strong><p>Cancellation removes this ticket from the active order queue.</p>
     <button className="ops-button" disabled={queue.saving} onClick={() => void queue.transition(order, "CANCELLED")}>Confirm cancellation</button>
@@ -173,29 +174,313 @@ function StaffTickets({ queue, view }: { queue: ManagerQueue; view: ManagerQueue
         <Stage status={order.status} />
       </button></li>)}</ul>}
     </section>
-    <aside className="delivery-detail" ref={detail} tabIndex={-1} aria-label="Order details">{selected ? <Details key={selected.id} order={selected} queue={queue} /> :
+    <aside className="delivery-detail" ref={detail} tabIndex={-1} aria-label="Order details">{selected ? <div className="delivery-ticket-detail" key={selected.id}><Details order={selected} queue={queue} /></div> :
       <div className="delivery-detail-placeholder"><span>Order ticket</span><p>Select an order to see its dishes and handoff details.</p></div>}</aside>
   </div>;
 }
 
+function kitchenMoves(order: ManagerDelivery) {
+  const next = nextOrderAction(order);
+  const forward =
+    next?.status === "PREPARING" ||
+    next?.status === "READY_FOR_PICKUP" ||
+    next?.status === "OUT_FOR_DELIVERY"
+      ? { status: next.status, title: next.title }
+      : null;
+  const previous: KitchenStage | null =
+    order.status === "READY_FOR_PICKUP"
+      ? "PREPARING"
+      : order.status === "PREPARING"
+        ? "RECEIVED"
+        : null;
+  const backward =
+    order.fulfillment === "PICKUP" && !order.archived ? previous : null;
+  return { forward, backward };
+}
+
 function KitchenTickets({ queue }: { queue: ManagerQueue }) {
-  const sorted = [...queue.orders].sort((a,b) => a.createdAt.localeCompare(b.createdAt));
-  const stages = stagesFor(queue.orders);
-  return <div className="delivery-kds" data-columns={stages.length}>{stages.map(status => {
-    const orders = sorted.filter(order => order.status === status);
-    return <section key={status} className={"delivery-station station-" + status.toLowerCase()} aria-label={kitchenNames[status]}>
-      <header><h2>{kitchenNames[status]}</h2><span>{orders.length}</span></header>
-      {!orders.length && <p className="delivery-station-empty">{kitchenEmpty[status]}</p>}
-      {orders.map(order => <article key={order.id} className="delivery-kitchen-ticket" aria-label={(order.fulfillment === "PICKUP" ? "Pickup " : "Delivery ") + order.number}>
-        <div className="delivery-detail-head"><div><span>{order.fulfillment === "PICKUP" ? "Pickup ticket" : "Delivery ticket"}</span><h3>{order.number}</h3></div><time dateTime={order.createdAt}>{stamp(order.createdAt)}</time></div>
-        {queue.checked && <p className="delivery-kitchen-elapsed">
-          {kitchenTiming[status]} <strong>{elapsed(order.updatedAt, queue.checked)}</strong>
-        </p>}
-        <Items order={order} />
-        <Actions key={order.version} kitchen order={order} queue={queue} />
-      </article>)}
-    </section>;
-  })}</div>;
+  const [dragging, setDragging] = useState<ManagerDelivery | null>(null);
+  const [dropStage, setDropStage] = useState<KitchenStage | null>(null);
+  const [moveNotice, setMoveNotice] = useState("");
+  const [backwardMove, setBackwardMove] = useState<{
+    order: ManagerDelivery;
+    stage: KitchenStage;
+  } | null>(null);
+  const board = useRef<HTMLDivElement>(null);
+  const focusTicket = useRef<string | null>(null);
+  const confirmation = useRef<HTMLDialogElement>(null);
+  const confirmationTitle = useRef<HTMLHeadingElement>(null);
+  const { orders, checked, saving } = queue;
+  const sorted = [...orders].sort((a, b) =>
+    a.createdAt.localeCompare(b.createdAt),
+  );
+  const stages = stagesFor(orders);
+  const dragMoves = dragging && kitchenMoves(dragging);
+
+  useEffect(() => {
+    const id = focusTicket.current;
+    if (saving || !id) return;
+    focusTicket.current = null;
+    board.current
+      ?.querySelector<HTMLElement>(`[data-ticket-id="${CSS.escape(id)}"]`)
+      ?.focus();
+  }, [saving, orders]);
+
+  useEffect(() => {
+    if (backwardMove && !confirmation.current?.open) {
+      confirmation.current?.showModal();
+      confirmationTitle.current?.focus();
+    }
+  }, [backwardMove]);
+
+  function clearDrag() {
+    setDragging(null);
+    setDropStage(null);
+  }
+
+  function acceptsDrop(stage: KitchenStage) {
+    return (
+      !saving &&
+      Boolean(
+        dragMoves &&
+          (dragMoves.forward?.status === stage || dragMoves.backward === stage),
+      )
+    );
+  }
+
+  function move(
+    order: ManagerDelivery,
+    stage: KitchenStage,
+    fromButton = false,
+  ) {
+    if (saving) return;
+    const { forward, backward } = kitchenMoves(order);
+    setMoveNotice("");
+    if (forward?.status === stage) {
+      if (fromButton) focusTicket.current = order.id;
+      void queue.transition(order, stage);
+    } else if (backward === stage) {
+      setBackwardMove({ order, stage });
+    }
+  }
+
+  function confirmBackwardMove() {
+    if (!backwardMove || saving) return;
+    const { order, stage } = backwardMove;
+    const current = orders.find((ticket) => ticket.id === order.id);
+    confirmation.current?.close();
+    if (
+      !current ||
+      current.version !== order.version ||
+      kitchenMoves(current).backward !== stage
+    ) {
+      setMoveNotice(
+        "This ticket changed while you were reviewing it. Check its current stage.",
+      );
+      return;
+    }
+    focusTicket.current = current.id;
+    void queue.transition(current, stage);
+  }
+
+  function drop(event: DragEvent<HTMLElement>, stage: KitchenStage) {
+    if (!dragging || !acceptsDrop(stage)) return;
+    event.preventDefault();
+    const ticketId = event.dataTransfer.getData(kitchenTicketType);
+    clearDrag();
+    if (ticketId !== dragging.id) return;
+    const current = orders.find((order) => order.id === ticketId);
+    if (!current || current.version !== dragging.version) {
+      setMoveNotice(
+        "This ticket changed while you were moving it. Check its current stage.",
+      );
+      return;
+    }
+    move(current, stage);
+  }
+
+  return (
+    <>
+      {orders.length > 0 && (
+        <p className="delivery-kitchen-drag-hint">
+          Drag a ticket to a highlighted stage, or use its status buttons.
+        </p>
+      )}
+      <p className="delivery-message" role="status">
+        {moveNotice}
+      </p>
+      <div ref={board} className="delivery-kds" data-columns={stages.length}>
+        {stages.map((status) => {
+          const cards = sorted.filter((order) => order.status === status);
+          const accepts = acceptsDrop(status);
+          return (
+            <section
+              key={status}
+              className={"delivery-station station-" + status.toLowerCase()}
+              aria-label={kitchenNames[status]}
+              data-drop-target={
+                accepts
+                  ? dropStage === status
+                    ? "active"
+                    : "available"
+                  : undefined
+              }
+              onDragOver={(event) => {
+                if (!accepts) return;
+                event.preventDefault();
+                event.dataTransfer.dropEffect = "move";
+                setDropStage(status);
+              }}
+              onDragLeave={(event) => {
+                if (dropStage !== status) return;
+                if (
+                  event.relatedTarget instanceof Node &&
+                  event.currentTarget.contains(event.relatedTarget)
+                )
+                  return;
+                setDropStage(null);
+              }}
+              onDrop={(event) => drop(event, status)}
+            >
+              <header>
+                <h2>{kitchenNames[status]}</h2>
+                <span>{cards.length}</span>
+              </header>
+              {!cards.length && (
+                <p className="delivery-station-empty">{kitchenEmpty[status]}</p>
+              )}
+              {cards.map((order) => {
+                const { forward, backward } = kitchenMoves(order);
+                const canDrag = Boolean((forward || backward) && !saving);
+                return (
+                  <article
+                    key={order.id}
+                    className="delivery-kitchen-ticket"
+                    aria-label={
+                      (order.fulfillment === "PICKUP"
+                        ? "Pickup "
+                        : "Delivery ") + order.number
+                    }
+                    draggable={canDrag}
+                    data-ticket-id={order.id}
+                    data-dragging={dragging?.id === order.id || undefined}
+                    tabIndex={-1}
+                    onDragStart={(event) => {
+                      if (!canDrag) {
+                        event.preventDefault();
+                        return;
+                      }
+                      event.dataTransfer.setData(kitchenTicketType, order.id);
+                      event.dataTransfer.effectAllowed = "move";
+                      setMoveNotice("");
+                      setDragging(order);
+                    }}
+                    onDragEnd={clearDrag}
+                  >
+                    <div className="delivery-detail-head">
+                      <div>
+                        <span>
+                          {order.fulfillment === "PICKUP"
+                            ? "Pickup ticket"
+                            : "Delivery ticket"}
+                        </span>
+                        <h3>{order.number}</h3>
+                      </div>
+                      <div className="delivery-kitchen-ticket-meta">
+                        <time dateTime={order.createdAt}>
+                          {stamp(order.createdAt)}
+                        </time>
+                        {canDrag && (
+                          <span
+                            className="delivery-kitchen-grip"
+                            aria-hidden="true"
+                          >
+                            ⠿
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    {checked && (
+                      <p className="delivery-kitchen-elapsed">
+                        {kitchenTiming[status]}{" "}
+                        <strong>{elapsed(order.updatedAt, checked)}</strong>
+                      </p>
+                    )}
+                    <Items order={order} />
+                    {(forward || backward) && (
+                      <div
+                        className="delivery-actions delivery-kitchen-actions"
+                        role="group"
+                        aria-label={`Move ${order.number}`}
+                      >
+                        {forward && (
+                          <button
+                            type="button"
+                            className="ops-button"
+                            disabled={saving}
+                            onClick={() => move(order, forward.status, true)}
+                          >
+                            {forward.title} <span aria-hidden="true">→</span>
+                          </button>
+                        )}
+                        {backward && (
+                          <button
+                            type="button"
+                            className="ops-text-button"
+                            disabled={saving}
+                            onClick={() => move(order, backward, true)}
+                          >
+                            <span aria-hidden="true">← </span>Back to{" "}
+                            {kitchenNames[backward].toLowerCase()}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                  </article>
+                );
+              })}
+            </section>
+          );
+        })}
+      </div>
+      <dialog
+        className="delivery-kitchen-confirm"
+        ref={confirmation}
+        aria-labelledby="kitchen-move-title"
+        onClose={() => setBackwardMove(null)}
+      >
+        {backwardMove && (
+          <form
+            onSubmit={(event) => {
+              event.preventDefault();
+              confirmBackwardMove();
+            }}
+          >
+            <h2 id="kitchen-move-title" tabIndex={-1} ref={confirmationTitle}>
+              Move {backwardMove.order.number} back?
+            </h2>
+            <p>
+              The ticket will return to{" "}
+              {kitchenNames[backwardMove.stage].toLowerCase()}. This also
+              updates the customer’s pickup status.
+            </p>
+            <div className="delivery-kitchen-confirm-actions">
+              <button type="submit" className="ops-button" disabled={saving}>
+                Move back to {kitchenNames[backwardMove.stage].toLowerCase()}
+              </button>
+              <button
+                type="button"
+                className="ops-text-button"
+                onClick={() => confirmation.current?.close()}
+              >
+                Keep current stage
+              </button>
+            </div>
+          </form>
+        )}
+      </dialog>
+    </>
+  );
 }
 
 function Feed({ screen, managerId, view, cursor, older, newer }: { screen: Screen; managerId: string; view: ManagerQueueScope; cursor: string; older(cursor: string): void; newer(): void }) {

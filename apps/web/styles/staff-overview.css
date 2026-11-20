@@ -145,7 +145,7 @@
 .staff-overview i[data-status] { display: inline-block; flex: 0 0 7px; width: 7px; height: 7px; border-radius: 50%; background: #766e69; }
 .staff-overview i[data-status="RECEIVED"] { background: #b9040c; }
 .staff-overview i[data-status="PREPARING"] { background: #956028; }
-.staff-overview i[data-status="READY_FOR_PICKUP"] { background: #347758; }
+.staff-overview i[data-status="READY_FOR_PICKUP"] { background: #7d6451; }
 .staff-overview i[data-status="PICKED_UP"] { background: #376e84; }
 .staff-overview a.staff-overview-text-link { display: inline-flex; align-items: center; gap: 9px; min-height: 44px; margin-block-start: 9px; color: var(--overview-red); font-weight: 680; text-underline-offset: 4px; }
 

@@ -43,8 +43,7 @@ export default function FooterFeast({ items }: { items: readonly MenuCatalogItem
             {lunchMenuDetails.holidaysExcluded && " · Holidays excluded"}
           </p>
           <p>
-            Each lunch entrée comes with jasmine rice, a vegetable spring roll
-            and your choice of soup of the day or pop.
+            Lunch sides and preparation options vary by dish.
           </p>
           <Link href="/menu/" className="footer-feast-link">
             <span>View the lunch menu</span>

@@ -79,7 +79,7 @@
 }
 
 .staff-marketing-audience .marketing-enabled {
-  color: #365948;
+  color: #674d34;
 }
 
 .staff-marketing-alert,
@@ -96,8 +96,8 @@
 }
 
 .staff-marketing-notice:not(:empty) {
-  border-inline-start-color: #365948;
-  background: #edf2ee;
+  border-inline-start-color: #674d34;
+  background: #f8f2e9;
 }
 
 .staff-marketing-layout {

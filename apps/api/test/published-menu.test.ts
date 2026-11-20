@@ -466,7 +466,8 @@ test(
       assert.equal((await tracked.json()).pickup.totalCents, 1650);
       const packaged = await post("/v1/auth/pickups/quote", basket);
       assert.equal(packaged.status, 200);
-      assert.equal((await packaged.json()).totalCents, 1399);
+      const oldPackagedQuote = await packaged.json();
+      assert.equal(oldPackagedQuote.totalCents, 1399);
       for (const modifierGroupIds of [
         ["unknown-group"],
         ["lunch-side", "lunch-side"],
@@ -490,10 +491,65 @@ test(
         (await (await fetch(base + "/v1/menu")).json()).version,
         resetPublic.version,
       );
+      const modifierPriceOverrides = {
+        "lunch-jasmine-rice": 125,
+        "lunch-fried-rice": 0,
+      };
+      for (const invalid of [
+        { "lunch-jasmine-rice": -1 },
+        { "lunch-style-hakka": 100 },
+      ]) {
+        const rejected = await post(
+          path,
+          {
+            expectedVersion: resetPublic.version,
+            patch: { modifierPriceOverrides: invalid },
+          },
+          cookie,
+        );
+        assert.equal(rejected.status, 400);
+      }
+      const optionPrices = await post(
+        path,
+        {
+          expectedVersion: resetPublic.version,
+          patch: { modifierPriceOverrides },
+        },
+        cookie,
+      );
+      assert.equal(optionPrices.status, 200);
+      const optionPriceVersion = (await optionPrices.json()).version;
+      const publishedPrices = await (await fetch(base + "/v1/menu")).json();
+      assert.deepEqual(
+        publishedPrices.overrides[item].modifierPriceOverrides,
+        modifierPriceOverrides,
+      );
+      const optionQuote = await post("/v1/auth/pickups/quote", basket);
+      assert.equal(optionQuote.status, 200);
+      assert.equal((await optionQuote.json()).totalCents, 1524);
+      const freeUpgrade = await post("/v1/auth/pickups/quote", {
+        lines: basket.lines.map((line) => ({
+          ...line,
+          modifierIds: line.modifierIds.map((id) =>
+            id === "lunch-jasmine-rice" ? "lunch-fried-rice" : id,
+          ),
+        })),
+      });
+      assert.equal(freeUpgrade.status, 200);
+      assert.equal((await freeUpgrade.json()).totalCents, 1399);
+      const stalePickup = await post("/v1/auth/pickups", {
+        ...basket,
+        requestId: randomUUID(),
+        name: "Synthetic stale option price",
+        phone: "6135550199",
+        expectedTotalCents: oldPackagedQuote.totalCents,
+        quoteFingerprint: oldPackagedQuote.quoteFingerprint,
+      });
+      assert.equal(stalePickup.status, 409);
       const disabledChoices = await post(
         newDishPath + "/" + item,
         {
-          expectedVersion: resetPublic.version,
+          expectedVersion: optionPriceVersion,
           patch: { modifierGroupIds: [] },
         },
         cookie,
@@ -511,6 +567,10 @@ test(
         currentPublished.customItems,
       ).find((dish) => dish.id === item)!;
       assert.deepEqual(publicDish.modifierGroups, []);
+      assert.deepEqual(
+        currentPublished.overrides[item].modifierPriceOverrides,
+        {},
+      );
       assert.equal(publicDish.description, "Includes a vegetable spring roll.");
       const choosePreparation = await post(
         newDishPath + "/" + customId,
@@ -602,6 +662,7 @@ test(
       assert.deepEqual(archivedMenu.overrides[item], {
         archived: true,
         modifierGroupIds: [],
+        modifierPriceOverrides: {},
       });
       const restoreDish = await post(
         newDishPath + "/" + item,

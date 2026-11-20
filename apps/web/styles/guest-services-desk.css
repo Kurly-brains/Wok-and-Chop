@@ -109,7 +109,7 @@
   font-size: .75rem;
   font-weight: 700;
 }
-.guest-desk-badge[data-status="CONFIRMED"] { border-color: #aac5b4; background: #eaf3ec; color: #224e36; }
+.guest-desk-badge[data-status="CONFIRMED"] { border-color: #d6c1ab; background: #f2ece3; color: #69482e; }
 .guest-desk-badge:is([data-status="DECLINED"], [data-status="CANCELLED"]) { border-color: #cdb0b1; background: #f7ebeb; color: #722c31; }
 
 .guest-desk-detail {
