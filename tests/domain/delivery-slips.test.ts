@@ -19,3 +19,13 @@ test("driver slips show addresses and handoff instructions, omitting kitchen and
   assert.match(text, /613-555-0100/); assert.match(text, /123 Test Street\nUnit 8/); assert.match(text, /lower bell/);
   assert.doesNotMatch(text, /Allergy|sesame|Sample entrée|\$/);
 });
+test("pickup kitchen slips label the handoff and preserve dish notes without an address", () => {
+  const order: DeliverySlipOrder = { ...example, number: "P-21", fulfillment: "PICKUP", status: "PICKED_UP", address: null };
+  const text = renderDeliverySlip(order, "kitchen");
+  assert.match(text, /PICKUP \/ KITCHEN COPY/);
+  assert.match(text, /ALREADY PICKED UP/);
+  assert.match(text, /Dry/);
+  assert.match(text, /Allergy: sesame/);
+  assert.doesNotMatch(text, /DELIVERY|Test Recipient|613-555-0100/);
+  assert.throws(() => renderDeliverySlip(order, "driver"), /delivery address is required/);
+});

@@ -88,7 +88,7 @@ export function StaffConsole() {
     setSelectedId(id);
     if (window.matchMedia("(max-width: 760px)").matches) detail.current?.focus();
   }
-  return <OperationsShell active="staff" training><main className="ops-main" id="main-content" tabIndex={-1}>
+  return <OperationsShell active="staff"><main className="ops-main" id="main-content" tabIndex={-1}>
     <div className="ops-title-row"><div><p className="ops-service-date">Front of house · Kanata</p><h1>Order board</h1><p>Pickup tickets, kitchen progress and handoff.</p></div>
       <div className="ops-service-controls"><span className="ops-service-indicator"><span aria-hidden="true" />Training intake {service.paused ? "paused" : "open"}</span>
         <button type="button" className="ops-button" disabled={workspace.busy || service.paused} aria-expanded={intakeOpen} onClick={() => setIntakeOpen(!intakeOpen)}>{intakeOpen ? "Close entry" : "Enter training order"}</button>

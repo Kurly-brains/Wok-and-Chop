@@ -26,6 +26,7 @@ export interface MenuItem {
   image?: string;
   imagePresentation?: 'photo' | 'cutout';
   available?: boolean;
+  archived?: boolean;
   modifierGroups?: readonly ModifierGroup[];
   /** Blocks live pricing until restaurant content and operating configuration are approved. */
   fixture?: boolean;

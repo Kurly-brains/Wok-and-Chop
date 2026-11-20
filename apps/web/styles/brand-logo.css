@@ -1,9 +1,13 @@
 /* Original supplied PNG artwork; the box frame crops transparent padding only. */
+.site-header {
+  --brand-logo-width: 177px;
+  --brand-logo-height: 147px;
+}
 .site-header .wordmark.brand-logo {
   display: block;
-  width: 140px;
-  height: 118px;
-  min-height: 118px;
+  width: var(--brand-logo-width);
+  height: var(--brand-logo-height);
+  min-height: var(--brand-logo-height);
   padding: 0;
   overflow: hidden;
   background: #fff;
@@ -72,11 +76,14 @@
   transform: translate(-50%, -50%);
 }
 .site-header .brand-logo + nav {
-  margin-left: 160px;
+  margin-left: calc(var(--brand-logo-width) + 25px);
+  gap: clamp(16px, 1.55vw, 26px);
+  font-size: clamp(13px, 1.06vw, 15px);
 }
 .site-header.is-scrolled .brand-logo + nav {
-  margin-left: 204px;
+  margin-left: 213px;
 }
+
 .site-footer .footer-name.brand-logo-footer {
   display: block;
   flex: 0 0 260px;
@@ -92,31 +99,31 @@
   height: auto;
 }
 @media (max-width: 1100px) {
-  .site-header .wordmark.brand-logo {
-    width: 125px;
-    height: 110px;
-    min-height: 110px;
+  .site-header {
+    --brand-logo-width: 146px;
+    --brand-logo-height: 128px;
   }
   .site-header.is-scrolled .wordmark.brand-logo {
     width: 176px;
     height: 76px;
     min-height: 76px;
   }
-  .site-header .brand-logo + nav {
-    margin-left: 145px;
-  }
   .site-header.is-scrolled .brand-logo + nav {
-    margin-left: 196px;
+    margin-left: 204px;
+  }
+}
+@media (761px <= width <= 850px) {
+  .site-header .brand-logo + nav {
+    gap: 12px;
   }
 }
 @media (max-width: 760px) {
-  .site-header .wordmark.brand-logo {
-    width: 96px;
-    height: 90px;
-    min-height: 90px;
+  .site-header {
+    --brand-logo-width: 110px;
+    --brand-logo-height: 94px;
   }
-  .site-header .brand-logo .brand-logo-box {
-    width: calc(100% - 10px);
+  .site-header + .mobile-nav {
+    padding-top: 16px;
   }
   .site-header.is-scrolled .wordmark.brand-logo {
     width: 130px;
@@ -133,6 +140,14 @@
   .brand-logo-footer img {
     width: 220px;
     max-width: 100%;
+  }
+}
+@media (max-width: 360px) {
+  .site-header .header-actions {
+    gap: 10px;
+  }
+  .site-header .bag-button {
+    padding-inline: 8px;
   }
 }
 @media (prefers-reduced-motion: reduce) {

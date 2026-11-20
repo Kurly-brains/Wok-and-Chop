@@ -134,6 +134,7 @@ export const lunchMenuItems: readonly LunchMenuItem[] = [
 ];
 
 const lunchIds = new Set(lunchMenuItems.map((entry) => entry.id));
+export const customLunchId = /^lunch-custom-[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/;
 export function isLunchMenuItem(value: MenuItem): value is LunchMenuItem {
-  return lunchIds.has(value.id as LunchMenuItem['id']);
+  return lunchIds.has(value.id as LunchMenuItem['id']) || customLunchId.test(value.id);
 }

@@ -1,8 +1,6 @@
-import type { Metadata } from "next";
-import { StaffConsole } from "../../../components/operations/StaffConsole";
-import "../../../styles/operations.css";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Training order board · Wok & Chop", robots: { index: false, follow: false } };
-
-export default function StaffPage() { return <StaffConsole />; }
+export default function TrainingOrderDesk() {
+  redirect("/staff/");
+}
 

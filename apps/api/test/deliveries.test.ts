@@ -4,10 +4,10 @@ import { randomUUID } from "node:crypto";
 import { Pool } from "pg";
 import { createApplication } from "../src/app";
 import {
-  postalPrefixes,
-  prepareQuote,
-  quoteInput,
-} from "../src/delivery-input";
+  hash,
+  preparePickupQuote,
+  pickupQuoteInput,
+} from "../src/order-input";
 
 const origin = "http://127.0.0.1:3000";
 const lines = [
@@ -18,50 +18,34 @@ const lines = [
     note: "Synthetic private note",
   },
 ];
-const basket = { lines, postalCode: "K2K 1X1", promoCode: "WOK10" };
+const basket = { lines, promoCode: "WOK10" };
 const address = {
   street: "42 Test Lane",
   city: "Kanata",
   province: "ON",
-  postalCode: basket.postalCode,
+  postalCode: "K2K 1X1",
   unit: "7",
 };
 const databaseUrl = process.env.AUTH_TEST_DATABASE_URL;
 
-test("local zones accept configured Ontario prefixes and reject unverified cart amounts", () => {
-  const prior = process.env.DELIVERY_POSTAL_PREFIXES;
-  try {
-    process.env.DELIVERY_POSTAL_PREFIXES = "k2k,k2t";
-    assert.deepEqual(postalPrefixes(), ["K2K", "K2T"]);
-    assert.equal(prepareQuote(quoteInput(basket)).totals.totalCents, 2698);
-    assert.throws(
-      () => prepareQuote(quoteInput({ ...basket, postalCode: "K1A 0A9" })),
-      /outside/,
-    );
-    assert.throws(
-      () => quoteInput({ ...basket, postalCode: "V6B 1A1" }),
-      /Ontario/,
-    );
-    assert.throws(() => quoteInput({ ...basket, totalCents: 1 }), /Unexpected/);
-    assert.throws(
-      () => quoteInput({ ...basket, lines: [{ ...lines[0], priceCents: 1 }] }),
-      /unsupported/,
-    );
-    assert.throws(
-      () =>
-        prepareQuote(
-          quoteInput({ ...basket, lines: [{ ...lines[0], modifierIds: [] }] }),
-        ),
-      /choose/i,
-    );
-  } finally {
-    if (prior === undefined) delete process.env.DELIVERY_POSTAL_PREFIXES;
-    else process.env.DELIVERY_POSTAL_PREFIXES = prior;
-  }
+test("pickup quotes price the current catalog without accepting address or unverified cart amounts", () => {
+  const quote = preparePickupQuote(pickupQuoteInput(basket));
+  assert.equal(quote.totals.totalCents, 2698);
+  assert.equal(quote.totals.taxCents, null);
+  assert.throws(() => pickupQuoteInput({ ...basket, address }), /Unexpected/);
+  assert.throws(() => pickupQuoteInput({ ...basket, totalCents: 1 }), /Unexpected/);
+  assert.throws(
+    () => pickupQuoteInput({ ...basket, lines: [{ ...lines[0], priceCents: 1 }] }),
+    /unsupported/,
+  );
+  assert.throws(
+    () => preparePickupQuote(pickupQuoteInput({ ...basket, lines: [{ ...lines[0], modifierIds: [] }] })),
+    /choose/i,
+  );
 });
 
 test(
-  "local unpaid deliveries persist, replay safely, isolate customers and use authorized versioned dispatch",
+  "existing deliveries retain private tracking, reordering and manager dispatch after switching to Uber Eats",
   { skip: !databaseUrl },
   async () => {
     if (new URL(databaseUrl!).pathname !== "/wok_chop_auth_test")
@@ -73,7 +57,7 @@ test(
     });
     const db = new Pool({ connectionString: databaseUrl });
     const emails: string[] = [];
-    const keys: string[] = [];
+    const fixtureIds: string[] = [];
     try {
       await app.listen(0, "127.0.0.1");
       const base = await app.getUrl();
@@ -111,70 +95,38 @@ test(
         manager.user.id,
       ]);
       const config = await (await get("deliveries/config")).json();
-      assert.equal(config.mode, "LOCAL_UNPAID");
-      assert.equal(config.deliveryCents, null);
+      assert.equal(config.enabled, false);
       const quoted = await post("deliveries/quote", basket);
-      assert.equal(quoted.status, 200);
-      const quote = await quoted.json();
-      assert.equal(quote.subtotalCents, 2998);
-      assert.equal(quote.discountCents, 300);
-      assert.equal(quote.totalCents, 2698);
-      assert.equal(quote.items[0].name, "Chilli Chicken");
-      assert.equal(quote.taxCents, null);
-      const input = {
-        requestId: randomUUID(),
-        lines,
+      assert.equal(quoted.status, 503);
+      assert.match((await quoted.json()).message, /Uber Eats/);
+      assert.equal((await post("deliveries", {})).status, 503);
+      const quote = preparePickupQuote(pickupQuoteInput(basket));
+      const snapshot = {
+        ...quote.totals,
+        lines: quote.lines,
         promoCode: basket.promoCode,
         name: "Synthetic Recipient",
         phone: "613-555-0108",
         address,
         instructions: "Synthetic private directions",
-        quoteFingerprint: quote.quoteFingerprint,
-        expectedTotalCents: 2698,
       };
-      keys.push(input.requestId);
-      assert.equal(
-        (await post("deliveries", { ...input, expectedTotalCents: 1 })).status,
-        409,
-      );
-      assert.equal(
-        (await post("deliveries", { ...input, trackingToken: "x" })).status,
-        400,
-      );
-      assert.equal(
-        (
-          await post("deliveries", {
-            ...input,
-            address: { ...address, province: "QC" },
-          })
-        ).status,
-        400,
-      );
-      const pair = await Promise.all([
-        post("deliveries", input),
-        post("deliveries", input),
-      ]);
-      assert.deepEqual(
-        pair.map((r) => r.status),
-        [201, 201],
-      );
-      const first = await pair[0].json(),
-        again = await pair[1].json();
-      assert.deepEqual(first, again);
-      assert.match(first.trackingToken, /^[\da-f]{64}$/);
-      assert.equal(first.delivery.status, "RECEIVED");
-      assert.equal(first.delivery.version, 1);
-      assert.equal(JSON.stringify(first).includes("Synthetic"), false);
-      assert.equal(
-        (await post("deliveries", { ...input, name: "different" })).status,
-        409,
-      );
-      assert.equal((await post("deliveries", input, owner.cookie)).status, 409);
-      const ownKey = randomUUID();
-      keys.push(ownKey);
-      const own = await (
-        await post("deliveries", { ...input, requestId: ownKey }, owner.cookie)
-      ).json();
+      async function seedDelivery(accountId: string | null) {
+        const key = randomUUID();
+        const trackingToken = hash("delivery-tracking-v1:" + key);
+        const { rows: [record] } = await db.query<{ id: string; order_number: string; created_at: Date }>(
+          `INSERT INTO delivery_orders(customer_account_id,request_hash,request_fingerprint,tracking_hash,snapshot)
+           VALUES($1,$2,$3,$4,$5) RETURNING id,order_number,created_at`,
+          [accountId, hash(key), hash(key), hash(trackingToken), snapshot],
+        );
+        fixtureIds.push(record.id);
+        await db.query(
+          "INSERT INTO delivery_order_events(order_id,version,status,created_at) VALUES($1,1,'RECEIVED',$2)",
+          [record.id, record.created_at],
+        );
+        return { delivery: { id: record.id, number: "D-" + record.order_number }, trackingToken };
+      }
+      const first = await seedDelivery(null);
+      const own = await seedDelivery(owner.user.id);
       const mine = await (await get("deliveries/mine", owner.cookie)).json();
       assert.deepEqual(
         mine.deliveries.map((order: { id: string }) => order.id),
@@ -354,11 +306,10 @@ test(
         /immutable/,
       );
     } finally {
-      // Key-scoped cleanup also catches an assertion failure immediately after creation.
-      if (keys.length)
+      if (fixtureIds.length)
         await db.query(
-          "DELETE FROM delivery_orders WHERE request_hash IN (SELECT encode(sha256(convert_to(value,'UTF8')),'hex') FROM unnest($1::text[]) AS keys(value))",
-          [keys],
+          "DELETE FROM delivery_orders WHERE id=ANY($1::uuid[])",
+          [fixtureIds],
         );
       if (emails.length)
         await db.query(

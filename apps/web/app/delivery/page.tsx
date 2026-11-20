@@ -1,11 +1,6 @@
-import type { Metadata } from "next";
-import Storefront from "../../components/storefront";
-
-export const metadata: Metadata = {
-  title: "Home Delivery · Wok & Chop",
-  description: "Review your Wok & Chop delivery and track your order.",
-};
+import { redirect } from "next/navigation";
+import { uberEatsUrl } from "../../lib/ordering";
 
 export default function DeliveryPage() {
-  return <Storefront page="delivery" />;
+  redirect(uberEatsUrl);
 }

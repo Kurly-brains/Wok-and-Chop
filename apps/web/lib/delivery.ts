@@ -36,17 +36,6 @@ export type Delivery = {
   totalCents: number;
 };
 
-export type DeliveryQuote = {
-  items: Delivery["items"];
-  subtotalCents: number;
-  discountCents: number;
-  taxCents: number | null;
-  deliveryCents: number | null;
-  totalCents: number;
-  quoteFingerprint: string;
-};
-
-export const deliveryPromoKey = "wok-chop:delivery-promo";
 export const guestReceiptKey = "wok-chop:guest-delivery";
 
 export function readDeliverySession(key: string) {

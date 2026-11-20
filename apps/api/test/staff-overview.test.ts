@@ -1,0 +1,127 @@
+import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import test from "node:test";
+import { Pool } from "pg";
+import { createApplication } from "../src/app";
+import { hash } from "../src/order-input";
+import { queryStaffOverview, type StaffOverview } from "../src/staff-overview";
+
+const databaseUrl = process.env.AUTH_TEST_DATABASE_URL;
+const origin = "http://127.0.0.1:3000";
+
+test("manager overview reports private, real pickup metrics in zero-filled Toronto calendar periods", { skip: !databaseUrl }, async () => {
+  if (new URL(databaseUrl!).pathname !== "/wok_chop_auth_test") throw new Error("Dedicated test database required");
+  const db = new Pool({ connectionString: databaseUrl });
+  const app = await createApplication({ authDatabaseUrl: databaseUrl, webOrigin: origin });
+  const emails: string[] = [];
+  const reportDb = await db.connect();
+  try {
+    await app.listen(0, "127.0.0.1");
+    const base = `${await app.getUrl()}/v1/auth/`;
+    const get = (query = "", cookie?: string) => fetch(`${base}admin/overview${query}`, { headers: cookie ? { Cookie: cookie } : {} });
+    async function register(manager = false) {
+      const email = `overview-${randomUUID()}@example.invalid`;
+      emails.push(email);
+      const response = await fetch(base + "register", { method: "POST", headers: { Origin: origin, "Content-Type": "application/json" }, body: JSON.stringify({ name: "Synthetic overview fixture", email, password: "Synthetic test password!" }) });
+      assert.equal(response.status, 201);
+      const { user } = await response.json();
+      if (manager) await db.query("INSERT INTO restaurant_managers(account_id) VALUES($1)", [user.id]);
+      return { id: user.id, cookie: response.headers.getSetCookie()[0].split(";")[0] };
+    }
+    const customer = await register(), manager = await register(true);
+    assert.equal((await get()).status, 401);
+    assert.equal((await get("", customer.cookie)).status, 403);
+    for (const query of ["?days=0", "?days=2", "?days=365", "?days=7%3BDROP%20TABLE%20delivery_orders", "?days=7&days=30"]) assert.equal((await get(query, manager.cookie)).status, 400);
+    const response = await get("", manager.cookie);
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("cache-control"), "no-store");
+    const live = await response.json() as StaffOverview;
+    assert.equal(live.days, 7);
+    assert.equal(live.timezone, "America/Toronto");
+    assert.equal(live.fulfillment, "PICKUP");
+    assert.equal(live.currency, "CAD");
+    assert.equal(live.currentWindowPartial, true);
+    assert.equal(live.trend.periods.length, 7);
+    await reportDb.query("CREATE TEMP TABLE delivery_orders (LIKE public.delivery_orders INCLUDING ALL)");
+    const clock = new Date("2026-11-20T18:00:00Z");
+    const baseline = await queryStaffOverview(reportDb, 7, clock);
+    assert.equal(baseline.metrics.current.orders, 0, "Overview test window must be isolated");
+    assert.equal(baseline.metrics.previous.orders, 0, "Previous test window must be isolated");
+    async function seed(createdAt: string, status: string, total: unknown, itemId = "synthetic-noodles", quantity = 1, archived = false, fulfillment = "PICKUP", lines?: unknown) {
+      const key = randomUUID();
+      const snapshot = { name: "Private guest name", phone: "6135550199", email: "private@example.invalid", totalCents: total,
+        lines: lines ?? [{ itemId, name: itemId === "synthetic-noodles" ? "Synthetic noodles" : "Synthetic rice", quantity, lineTotalCents: total }] };
+      const { rows: [row] } = await reportDb.query("INSERT INTO delivery_orders(request_hash,request_fingerprint,tracking_hash,snapshot,status,fulfillment,created_at,updated_at,archived_at,manager_note) VALUES($1,$2,$3,$4,$5,$6,$7,$7,CASE WHEN $8 THEN $7::timestamptz ELSE NULL END,'Private staff note') RETURNING id", [hash(key), hash(key + "fingerprint"), hash(key + "tracking"), JSON.stringify(snapshot), status, fulfillment, createdAt, archived]);
+      return row.id as string;
+    }
+    const first = await seed("2026-11-14T05:00:00Z", "PICKED_UP", 1400, "synthetic-noodles", 2);
+    const archived = await seed("2026-11-20T13:00:00Z", "PICKED_UP", 600, "synthetic-rice", 1, true);
+    await seed("2026-11-20T14:00:00Z", "RECEIVED", 700);
+    await seed("2026-11-15T17:00:00Z", "CANCELLED", 9999);
+    await seed("2026-11-07T05:00:00Z", "PICKED_UP", 900);
+    await seed("2026-11-14T04:59:59.999Z", "PICKED_UP", 1100);
+    await seed("2026-11-07T04:59:59.999Z", "PICKED_UP", 9999);
+    const future = await seed("2026-11-20T18:00:01Z", "PICKED_UP", 8888);
+    await seed("2026-11-15T17:00:00Z", "DELIVERED", 9999, "synthetic-noodles", 99, false, "DELIVERY");
+    await seed("2026-11-01T12:00:00Z", "PREPARING", 700);
+    const report = await queryStaffOverview(reportDb, 7, clock);
+    assert.deepEqual(report.range, { startDate: "2026-11-14", endDate: "2026-11-20" });
+    assert.deepEqual(report.previousRange, { startDate: "2026-11-07", endDate: "2026-11-13" });
+    assert.deepEqual(report.metrics.current, { orders: 4, completed: 2, cancelled: 1, completedFoodTotalCents: 2000, averageCompletedValueCents: 1000 });
+    assert.deepEqual(report.metrics.previous, { orders: 2, completed: 2, cancelled: 0, completedFoodTotalCents: 2000, averageCompletedValueCents: 1000 });
+    assert.deepEqual(report.statusTotals, { RECEIVED: 1, PREPARING: 0, READY_FOR_PICKUP: 0, PICKED_UP: 2, CANCELLED: 1 });
+    assert.equal(report.queue.total, baseline.queue.total + 2);
+    assert.equal(report.queue.byStatus.RECEIVED, baseline.queue.byStatus.RECEIVED + 1);
+    assert.equal(report.queue.byStatus.PREPARING, baseline.queue.byStatus.PREPARING + 1);
+    assert.deepEqual(report.topDishes, [{ itemId: "synthetic-noodles", name: "Synthetic noodles", quantity: 2, completedOrders: 1 }, { itemId: "synthetic-rice", name: "Synthetic rice", quantity: 1, completedOrders: 1 }]);
+    assert.equal(report.trend.granularity, "day");
+    assert.equal(report.trend.periods.reduce((total, period) => total + period.orders, 0), 4);
+    assert.equal(report.trend.periods[2].orders, 0);
+    assert.equal(report.trend.periods[2].completedFoodTotalCents, 0);
+    assert.ok(report.trend.periods.every((period, index, periods) => !index || Date.parse(period.startAt) === Date.parse(periods[index - 1].endAt)));
+    assert.equal(report.recentPickups.length, 4);
+    assert.equal(report.recentPickups.find(order => order.id === archived)?.archived, true);
+    assert.equal(report.recentPickups.find(order => order.id === first)?.itemCount, 2);
+    assert.ok(!report.recentPickups.some(order => order.id === future));
+    assert.doesNotMatch(JSON.stringify(report), /Private|phone|email|manager_note|tracking|customer_account|example\.invalid/);
+    const today = await queryStaffOverview(reportDb, 1, clock);
+    assert.equal(today.trend.granularity, "hour");
+    assert.equal(today.trend.periods.length, 24);
+    assert.equal(today.metrics.current.orders, 2);
+    assert.equal(today.metrics.current.completedFoodTotalCents, 600);
+    assert.equal(today.trend.periods.find(period => period.label === "08:00")?.completedFoodTotalCents, 600);
+    assert.ok(today.trend.periods.filter(period => Date.parse(period.startAt) > clock.valueOf()).every(period => period.orders === 0));
+    const spring = await queryStaffOverview(reportDb, 1, new Date("2026-03-08T16:00:00Z"));
+    assert.equal(spring.trend.periods.length, 23);
+    assert.ok(!spring.trend.periods.some(period => period.label === "02:00"));
+    const autumn = await queryStaffOverview(reportDb, 1, new Date("2026-11-01T17:00:00Z"));
+    assert.equal(autumn.trend.periods.length, 25);
+    assert.equal(autumn.trend.periods.filter(period => period.label === "01:00").length, 2);
+    assert.equal(new Set(autumn.trend.periods.map(period => period.startAt)).size, 25);
+    const month = await queryStaffOverview(reportDb, 30, clock);
+    assert.equal(month.trend.periods.length, 30);
+    assert.equal(month.range.startDate, "2026-10-22");
+    assert.ok(month.trend.periods.every((period, index, periods) => !index || Date.parse(period.startAt) === Date.parse(periods[index - 1].endAt)));
+    const empty = await queryStaffOverview(reportDb, 7, new Date("1999-01-20T17:00:00Z"));
+    assert.deepEqual(empty.metrics.current, { orders: 0, completed: 0, cancelled: 0, completedFoodTotalCents: 0, averageCompletedValueCents: null });
+    assert.deepEqual(empty.topDishes, []);
+    assert.deepEqual(empty.recentPickups, []);
+    assert.equal(empty.queue.total, 0);
+    await seed("2026-11-20T15:00:00Z", "PICKED_UP", "invalid amount", "synthetic-noodles", 1, false, "PICKUP", { invalid: "lines" });
+    const malformed = await queryStaffOverview(reportDb, 7, clock);
+    assert.equal(malformed.metrics.current.completed, 3);
+    assert.equal(malformed.metrics.current.completedFoodTotalCents, null);
+    assert.equal(malformed.metrics.current.averageCompletedValueCents, null);
+    assert.deepEqual(malformed.topDishes, report.topDishes);
+    assert.equal(malformed.recentPickups[0].totalCents, null);
+    assert.equal(malformed.recentPickups[0].itemCount, 0);
+    for (const days of [1, 7, 30]) assert.equal((await get(`?days=${days}`, manager.cookie)).status, 200);
+    await db.query("DELETE FROM restaurant_managers WHERE account_id=$1", [manager.id]);
+    assert.equal((await get("", manager.cookie)).status, 403);
+  } finally {
+    reportDb.release();
+    await db.query("DELETE FROM customer_accounts WHERE email_normalized=ANY($1::text[])", [emails]);
+    await app.close();
+    await db.end();
+  }
+});

@@ -24,7 +24,9 @@ The earlier proposal to drive the homepage from featured lunch dishes is superse
 
 ## Local editing and launch boundary
 
-`/staff/menu/` lets local restaurant managers publish lunch prices, details, availability and images to PostgreSQL. The public catalog and server quote use published changes, and previously accepted delivery snapshots retain their original prices and selections. Generated food imagery is illustrative.
+`/staff/menu/` lets local restaurant managers publish lunch prices, details, availability, images and choice groups to PostgreSQL. New dishes can be published with zero choice groups. For dishes without choices, **Add** puts one serving straight into the bag. Dish photos and the bag’s **Edit** action still open details and kitchen notes.
+
+Managers can archive or restore dishes. Archived dishes stay in the staff editor and are unavailable on the storefront and in new quotes. A menu reset preserves archived dishes and their saved settings. Previously accepted orders keep their original prices and selections. Generated food imagery is illustrative.
 
 Imported lunch rows retain `fixture: true` for live-ordering eligibility. The local preview accepts unpaid delivery requests. Production menu operating details, taxes, reservations, payments and printer qualification require separate acceptance.
 

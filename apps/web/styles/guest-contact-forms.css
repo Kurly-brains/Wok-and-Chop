@@ -1,0 +1,229 @@
+.guest-contact-jumps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 20px;
+}
+
+.guest-contact-jumps a {
+  display: inline-flex;
+  align-items: center;
+  gap: 14px;
+  min-height: 44px;
+  padding: 8px 13px;
+  border: 1px solid var(--red-dark);
+  color: var(--red-dark);
+  font-size: .875rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.guest-contact-jumps a:first-child { background: var(--red-dark); color: white; }
+.guest-contact-jumps a:first-child:hover { background: var(--red); color: white; }
+.guest-contact-jumps a:last-child:hover { background: #f8efea; }
+
+.guest-contact-forms {
+  display: grid;
+  gap: 14px;
+  margin-top: clamp(32px, 6vw, 84px);
+  padding-top: clamp(22px, 4vw, 52px);
+  border-top: 3px double #b38370;
+}
+
+.guest-contact-preview {
+  grid-column: 1 / -1;
+  margin: 0;
+  color: var(--muted);
+  font-size: .875rem;
+}
+
+.guest-contact-card {
+  background: #fbf8f4;
+  border: 1px solid #d8cbc2;
+  min-width: 0;
+  scroll-margin-top: 106px;
+}
+
+.guest-contact-card > header {
+  position: relative;
+  isolation: isolate;
+  min-height: clamp(138px, 15vw, 165px);
+  padding: clamp(17px, 2.5vw, 29px);
+  color: #fff8ee;
+}
+
+.guest-contact-card > header::before {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  inset: 0;
+  background: #861c17;
+  clip-path: polygon(10px 0, calc(100% - 10px) 0, calc(100% - 10px) 10px, 100% 10px, 100% 100%, 0 100%, 0 10px, 10px 10px);
+}
+
+.guest-contact-card > header .ink-seal { color: #ffe0be; }
+.guest-contact-card h2 {
+  margin: 12px 0 6px;
+  font: 400 clamp(32px, 3.8vw, 48px)/1.05 var(--serif);
+  letter-spacing: -.04em;
+}
+
+.guest-contact-card > header p { margin: 0; font-size: .875rem; line-height: 1.55; }
+.guest-contact-form,
+.guest-contact-fallback,
+.guest-contact-confirmation { padding: clamp(17px, 2.5vw, 29px); }
+
+.guest-contact-form fieldset {
+  display: grid;
+  gap: 16px;
+  min-width: 0;
+  padding: 0;
+  border: 0;
+  margin: 0;
+}
+
+.guest-contact-schedule,
+.guest-contact-fields {
+  display: grid;
+  gap: 14px;
+}
+
+.guest-contact-schedule { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.guest-contact-fields { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.guest-contact-notes-field { grid-column: 1 / -1; }
+
+.guest-contact-form label {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  font-size: .875rem;
+  font-weight: 700;
+  align-content: start;
+}
+
+.guest-contact-form label small {
+  margin-inline-start: 4px;
+  color: var(--muted);
+  font-size: .75rem;
+  font-weight: 400;
+}
+
+.guest-contact-form :is(input, select, textarea) {
+  display: block;
+  width: 100%;
+  min-width: 0;
+  min-height: 46px;
+  padding: 9px 10px;
+  background: #fff;
+  border: 1px solid #b7a89c;
+  border-radius: 0;
+  color: var(--ink);
+  font: 400 1rem/1.35 var(--body);
+}
+
+.guest-contact-form textarea { resize: vertical; }
+.guest-contact-form :is(input, select, textarea, button):focus-visible,
+.guest-contact-confirmation :focus-visible {
+  outline: 2px solid var(--red-dark);
+  outline-offset: 2px;
+}
+
+.guest-contact-form-hint,
+.guest-contact-error,
+.guest-contact-fallback { margin: 0; font-size: .875rem; line-height: 1.55; }
+.guest-contact-form-hint { color: var(--muted); }
+.guest-contact-error { color: #861c17; border-left: 2px solid currentColor; padding-left: 9px; }
+.guest-contact-card a { text-decoration: underline; text-underline-offset: 3px; }
+
+.guest-contact-submit {
+  display: inline-flex;
+  justify-self: start;
+  align-items: center;
+  gap: 15px;
+  min-height: 46px;
+  padding: 9px 16px;
+  border: 0;
+  background: var(--red-dark);
+  color: white;
+  font: 700 .875rem/1.3 var(--body);
+  cursor: pointer;
+}
+
+.guest-contact-submit:hover { background: var(--red); }
+.guest-contact-form:has(fieldset:disabled) .guest-contact-submit { opacity: .63; cursor: wait; }
+.guest-contact-confirmation { display: grid; gap: 8px; }
+.guest-contact-confirmation h3 { margin: 0; color: var(--red-dark); font: 400 1.7rem/1.15 var(--serif); }
+.guest-contact-confirmation p { margin: 0; color: var(--muted); }
+.guest-contact-confirmation button {
+  justify-self: start;
+  border: 0;
+  min-height: 44px;
+  padding: 0;
+  background: transparent;
+  color: var(--red-dark);
+  font: 700 .875rem/1.3 var(--body);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+
+.guest-contact-forms--booking {
+  width: min(1180px, calc(100% - 64px));
+  margin: clamp(34px, 6vw, 80px) auto clamp(36px, 6vw, 86px);
+  padding-top: 0;
+  border-top: 0;
+}
+
+.guest-booking-card {
+  border: 0;
+  border-top: 3px solid #a92720;
+  background: #fbf6ef;
+}
+
+.guest-booking-card > header {
+  min-height: auto;
+  padding: clamp(22px, 4vw, 48px) clamp(18px, 3.8vw, 46px) 18px;
+  color: var(--ink);
+}
+
+.guest-booking-card > header::before { content: none; }
+.guest-booking-card > header .ink-seal { color: var(--red-dark); }
+.guest-booking-card h2 { color: var(--red-dark); font-size: clamp(38px, 6vw, 72px); }
+.guest-booking-card > header p { color: var(--muted); }
+.guest-booking-form {
+  padding: 16px clamp(18px, 3.8vw, 46px) clamp(24px, 4vw, 45px);
+}
+
+.guest-booking-form .guest-booking-layout {
+  grid-template-columns: minmax(0, .94fr) minmax(0, 1.06fr);
+  align-items: start;
+  gap: clamp(24px, 4.6vw, 64px);
+}
+
+.guest-booking-date,
+.guest-booking-details {
+  min-width: 0;
+  display: grid;
+  gap: 15px;
+}
+
+.guest-booking-layout h3 {
+  margin: 0;
+  padding-block: 12px 0;
+  border-top: 1px solid #d1b69e;
+  font: 400 clamp(24px, 3vw, 32px)/1.18 var(--serif);
+  color: var(--red-dark);
+}
+
+.guest-booking-details .guest-contact-fallback { padding: 0; }
+
+@media (max-width: 680px) {
+  .guest-contact-forms--booking { width: calc(100% - 40px); }
+  .guest-booking-form .guest-booking-layout { grid-template-columns: minmax(0, 1fr); }
+}
+
+@media (max-width: 500px) {
+  .guest-contact-schedule,
+  .guest-contact-fields { grid-template-columns: minmax(0, 1fr); }
+  .guest-contact-submit { justify-self: stretch; justify-content: space-between; }
+}

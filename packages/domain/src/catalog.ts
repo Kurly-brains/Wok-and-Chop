@@ -1,14 +1,16 @@
 import { categories, menuItems } from "./menu";
-import { lunchCategories, lunchMenuItems } from "./lunch-menu";
-import type { MenuItem } from "./types";
+import { customLunchId, lunchCategories, lunchMenuItems, lunchPreparationGroup, lunchSideGroup, lunchSoupOrPopGroup } from "./lunch-menu";
+import type { MenuItem, ModifierGroup } from "./types";
 
 export type MenuCatalogItem = MenuItem & {
   imagePresentation?: "photo" | "cutout";
+  modifierGroupIds?: readonly string[];
 };
 export type CatalogMenuItem = MenuCatalogItem;
 export type MenuItemPatch = Partial<
-  Pick<MenuCatalogItem, "name" | "description" | "categoryId" | "priceCents" | "available" | "imagePresentation" | "vegetarian" | "spicy" | "heatLevel" | "containsPeanuts" | "featured">
+  Pick<MenuCatalogItem, "name" | "description" | "categoryId" | "priceCents" | "available" | "archived" | "imagePresentation" | "vegetarian" | "spicy" | "heatLevel" | "containsPeanuts" | "featured" | "modifierGroupIds">
 > & { image?: string | null };
+export type NewMenuItem = MenuItemPatch & Required<Pick<MenuItemPatch, "name" | "categoryId" | "priceCents">>;
 
 export const MAX_MENU_IMAGE_BYTES = 500_000;
 export const MAX_MENU_STORAGE_BYTES = 2_500_000;
@@ -36,8 +38,51 @@ export const defaultCatalog: readonly MenuCatalogItem[] = Object.freeze(
   [...menuItems, ...lunchMenuItems].map((item) => Object.freeze({ ...item, ...defaultImages[item.id], fixture: true as const })),
 );
 const categoryIds = new Set([...categories, ...lunchCategories].filter((category) => category.id !== "all").map((category) => category.id));
-const allowedFields = new Set(["name", "description", "categoryId", "priceCents", "available", "image", "imagePresentation", "vegetarian", "spicy", "heatLevel", "containsPeanuts", "featured"]);
+const allowedFields = new Set(["name", "description", "categoryId", "priceCents", "available", "archived", "image", "imagePresentation", "vegetarian", "spicy", "heatLevel", "containsPeanuts", "featured", "modifierGroupIds"]);
+const knownModifierGroupIds = new Set(defaultCatalog.flatMap(item => item.modifierGroups?.map(group => group.id) ?? []));
 export type Overrides = Record<string, MenuItemPatch>;
+
+/** Omit id when authoring a new dish; packaged dishes retain their source choice groups. */
+export function availableDishModifierGroups(item: { id?: string; categoryId: string }): readonly ModifierGroup[] {
+  const packaged = defaultCatalog.find(candidate => candidate.id === item.id);
+  if (packaged) return packaged.modifierGroups ?? [];
+  if (item.id !== undefined && !customLunchId.test(item.id)) throw new Error("Unknown dish for menu choices.");
+  if (!lunchCategories.some(category => category.id === item.categoryId)) throw new Error("Choose a lunch category before selecting menu choices.");
+  return item.categoryId === "lunch-rice-noodles"
+    ? [lunchSideGroup, lunchSoupOrPopGroup]
+    : [lunchSideGroup, lunchSoupOrPopGroup, lunchPreparationGroup];
+}
+
+function selectedGroupIds(item: { id?: string; categoryId: string }, selected?: readonly string[]) {
+  if (selected === undefined) return undefined;
+  if (!Array.isArray(selected) || new Set(selected).size !== selected.length) throw new Error("Choose each supported menu choice group at most once.");
+  const available = availableDishModifierGroups(item);
+  if (selected.some(id => !available.some(group => group.id === id))) throw new Error("One or more selected choice groups do not apply to this dish. Review its choices after changing category.");
+  return Object.freeze(available.filter(group => selected.includes(group.id)).map(group => group.id));
+}
+
+const stockLunchDescriptions = new Set([
+  "Includes jasmine rice, a vegetable spring roll, and soup of the day or pop.",
+  "Includes jasmine rice and a vegetable spring roll.",
+  "Includes a vegetable spring roll and soup of the day or pop.",
+  "Includes a vegetable spring roll.",
+]);
+
+function withDishChoices(item: MenuCatalogItem): MenuCatalogItem {
+  const ids = selectedGroupIds(item, item.modifierGroupIds);
+  const groups = availableDishModifierGroups(item);
+  const chosen = ids === undefined ? groups : groups.filter(group => ids.includes(group.id));
+  let description = item.description;
+  if (lunchMenuItems.some(candidate => candidate.id === item.id) && stockLunchDescriptions.has(description)) {
+    const rice = chosen.some(group => group.id === "lunch-side");
+    const soup = chosen.some(group => group.id === "lunch-soup-or-pop");
+    description = rice && soup ? "Includes jasmine rice, a vegetable spring roll, and soup of the day or pop."
+      : rice ? "Includes jasmine rice and a vegetable spring roll."
+        : soup ? "Includes a vegetable spring roll and soup of the day or pop."
+          : "Includes a vegetable spring roll.";
+  }
+  return Object.freeze({ ...item, description, ...(ids === undefined ? {} : { modifierGroupIds: ids }), modifierGroups: Object.freeze([...chosen]) });
+}
 
 export function byteLength(value: string): number {
   return new TextEncoder().encode(value).byteLength;
@@ -95,7 +140,7 @@ export function validatePatch(value: unknown): MenuItemPatch {
         if (typeof field !== "number" || !Number.isSafeInteger(field) || field < 0 || field > 200_000) throw new Error("Price must be whole CAD cents between 0 and 200,000 ($2,000).");
         patch.priceCents = field;
         break;
-      case "available": case "vegetarian": case "spicy": case "containsPeanuts": case "featured":
+      case "available": case "archived": case "vegetarian": case "spicy": case "containsPeanuts": case "featured":
         if (typeof field !== "boolean") throw new Error(`${key} must be true or false.`);
         patch[key] = field;
         break;
@@ -108,21 +153,60 @@ export function validatePatch(value: unknown): MenuItemPatch {
         if (field !== "photo" && field !== "cutout") throw new Error("Choose photo or cutout image presentation.");
         patch.imagePresentation = field;
         break;
+      case "modifierGroupIds":
+        if (!Array.isArray(field) || field.length > knownModifierGroupIds.size || field.some(id => typeof id !== "string" || !knownModifierGroupIds.has(id)) || new Set(field).size !== field.length) {
+          throw new Error("Choose each supported menu choice group at most once.");
+        }
+        patch.modifierGroupIds = Object.freeze([...field]);
+        break;
     }
   }
   if (patch.heatLevel !== undefined) patch.spicy = patch.heatLevel > 0;
   return patch;
 }
 
-export function buildCatalog(overrides: Overrides): readonly MenuCatalogItem[] {
-  if (!Object.keys(overrides).length) return defaultCatalog;
-  return Object.freeze(defaultCatalog.map((item) => {
+export function validateNewMenuItem(value: unknown): NewMenuItem {
+  const patch = validatePatch(value);
+  if (!patch.name || patch.priceCents === undefined || patch.priceCents < 1 || !lunchCategories.some(category => category.id === patch.categoryId)) {
+    throw new Error("Enter a dish name, a lunch category and a positive price.");
+  }
+  if (patch.modifierGroupIds !== undefined) patch.modifierGroupIds = selectedGroupIds({ categoryId: patch.categoryId! }, patch.modifierGroupIds);
+  return patch as NewMenuItem;
+}
+
+export function createCustomMenuItem(id: string, input: NewMenuItem): MenuCatalogItem {
+  if (!customLunchId.test(id)) throw new Error("Invalid custom lunch dish identifier.");
+  const { image, ...fields } = input;
+  return withDishChoices({
+    description: "",
+    available: true,
+    vegetarian: input.categoryId === "lunch-vegetarian",
+    ...fields,
+    ...(image ? { image } : {}),
+    id,
+    fixture: true,
+  });
+}
+
+export function applyMenuItemPatch(item: MenuCatalogItem, patch: MenuItemPatch): MenuCatalogItem {
+  const { image, ...fields } = patch;
+  const next: MenuCatalogItem = { ...item, ...fields, fixture: true };
+  if (image === null) delete next.image;
+  else if (image !== undefined) next.image = image;
+  if (customLunchId.test(item.id)) {
+    const { id, ...editable } = next;
+    delete editable.modifierGroups;
+    delete editable.fixture;
+    return createCustomMenuItem(id, validateNewMenuItem(editable));
+  }
+  return withDishChoices(next);
+}
+
+export function buildCatalog(overrides: Overrides, customItems: readonly MenuCatalogItem[] = []): readonly MenuCatalogItem[] {
+  if (!Object.keys(overrides).length && customItems.length === 0) return defaultCatalog;
+  return Object.freeze([...defaultCatalog, ...customItems].map((item) => {
     const patch = overrides[item.id];
     if (!patch) return item;
-    const { image, ...fields } = patch;
-    const next: MenuCatalogItem = { ...item, ...fields, fixture: true };
-    if (image === null) delete next.image;
-    else if (image !== undefined) next.image = image;
-    return Object.freeze(next);
+    return applyMenuItemPatch(item, patch);
   }));
 }

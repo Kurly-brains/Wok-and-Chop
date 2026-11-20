@@ -1,0 +1,193 @@
+.guest-desk {
+  max-width: 1420px;
+  min-height: 68vh;
+  font-family: var(--body), Arial, sans-serif;
+}
+
+.guest-desk-heading,
+.guest-desk-session,
+.guest-desk-list-tools,
+.guest-desk-detail-heading,
+.guest-desk-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.guest-desk-heading {
+  padding-bottom: 18px;
+  border-bottom: 3px double #b48c79;
+}
+
+.guest-desk-heading p {
+  color: #70564a;
+  font-size: .6875rem;
+  font-weight: 700;
+  letter-spacing: .1em;
+  text-transform: uppercase;
+}
+
+.guest-desk-heading h1 {
+  margin-top: 5px;
+  color: #861c17;
+  font: 400 clamp(42px, 6vw, 72px)/1.05 var(--serif);
+  letter-spacing: -.05em;
+}
+
+.guest-desk .directory-login { margin-top: 26px; }
+.guest-desk-session, .guest-desk-list-tools, .guest-desk-date { color: var(--ops-muted); font-size: .8125rem; }
+
+.guest-desk-tabs, .guest-desk-scopes { display: flex; align-items: center; flex-wrap: wrap; }
+.guest-desk-tabs { gap: 18px; margin: 7px 0 18px; border-bottom: 1px solid var(--ops-line); }
+.guest-desk-scopes { gap: 7px; }
+.guest-desk-tabs button, .guest-desk-scopes button {
+  min-height: 44px;
+  color: var(--ops-ink);
+  font: inherit;
+  font-weight: 650;
+}
+
+.guest-desk-tabs button {
+  padding: 0 2px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+}
+
+.guest-desk-tabs button[aria-pressed="true"] { border-color: var(--ops-red); color: var(--ops-red); }
+.guest-desk-scopes button { padding: 6px 11px; border: 1px solid var(--ops-line); background: white; font-size: .875rem; }
+.guest-desk-scopes button[aria-pressed="true"] { border-color: #4e3730; background: #4e3730; color: white; }
+.guest-desk-list-tools { justify-content: flex-end; min-height: 44px; }
+.guest-desk-list-tools button, .guest-desk-pagination button, .guest-desk-session button { min-height: 44px; }
+.guest-desk-feedback, .guest-desk-error { margin-block: 0 12px; border-left: 2px solid var(--ops-red); padding: 8px 12px; font-size: .875rem; }
+.guest-desk-error { color: #861c17; }
+.guest-desk-empty { display: grid; justify-items: start; gap: 8px; padding-block: 26px; color: var(--ops-muted); }
+
+.guest-desk-split {
+  display: grid;
+  grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+  align-items: start;
+  gap: clamp(17px, 3.5vw, 45px);
+}
+
+.guest-desk-rows {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid #d6c9bf;
+}
+
+.guest-desk-rows button {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 8px 12px;
+  width: 100%;
+  min-height: 74px;
+  padding: 12px;
+  border: 0;
+  border-bottom: 1px solid #d6c9bf;
+  background: #fff;
+  color: var(--ops-ink);
+  text-align: start;
+}
+
+.guest-desk-rows button > span { display: grid; gap: 3px; justify-items: start; min-width: 0; overflow-wrap: anywhere; }
+.guest-desk-rows button > span:nth-child(2) { justify-items: end; text-align: end; }
+.guest-desk-rows button:hover, .guest-desk-rows button[aria-pressed="true"] { background: #f6eee8; }
+.guest-desk-rows button[aria-pressed="true"] { box-shadow: inset 3px 0 var(--ops-red); }
+.guest-desk-rows small { color: var(--ops-muted); font-size: .75rem; }
+
+.guest-desk-badge {
+  display: inline-block;
+  border: 1px solid #ccb99f;
+  background: #f7f1e5;
+  color: #674713;
+  padding: 3px 6px;
+  font-size: .75rem;
+  font-weight: 700;
+}
+.guest-desk-badge[data-status="CONFIRMED"] { border-color: #aac5b4; background: #eaf3ec; color: #224e36; }
+.guest-desk-badge:is([data-status="DECLINED"], [data-status="CANCELLED"]) { border-color: #cdb0b1; background: #f7ebeb; color: #722c31; }
+
+.guest-desk-detail {
+  min-width: 0;
+  padding: clamp(15px, 2.7vw, 30px);
+  border-top: 3px solid #861c17;
+  background: #f5efe8;
+  overflow-wrap: anywhere;
+}
+
+.guest-desk-detail h2 {
+  color: var(--ops-ink);
+  font: 400 clamp(28px, 3vw, 42px)/1.1 var(--serif);
+  letter-spacing: -.025em;
+}
+.guest-desk-detail > p { margin-top: 7px; }
+
+.guest-desk-contact-details {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px 15px;
+  margin: 16px 0 0;
+  padding-block: 12px;
+  border-block: 1px solid #d9cbc0;
+}
+
+.guest-desk-contact-details dt { color: var(--ops-muted); font-size: .75rem; }
+.guest-desk-contact-details dd { margin: 2px 0 0; }
+.guest-desk-contact-details a { text-decoration: underline; text-underline-offset: 3px; }
+.guest-desk-note { margin-block: 13px; }
+.guest-desk-note h3 { font-size: .875rem; }
+.guest-desk-note p { margin-top: 4px; white-space: pre-wrap; }
+
+.guest-desk-form { margin-top: 18px; }
+.guest-desk-form fieldset {
+  display: grid;
+  gap: 13px;
+  min-width: 0;
+  margin: 0;
+  border: 1px solid #c9baae;
+  padding: clamp(10px, 1.8vw, 19px);
+}
+.guest-desk-form legend { padding-inline: 5px; font-weight: 700; }
+.guest-desk-form label { display: grid; gap: 4px; min-width: 0; font-size: .875rem; font-weight: 650; }
+.guest-desk-form label small { margin-inline-start: 3px; color: var(--ops-muted); font-weight: 400; }
+
+.guest-desk-form :is(input, select, textarea) {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  border: 1px solid #aa9b90;
+  border-radius: 0;
+  padding: 7px 8px;
+  color: var(--ops-ink);
+  background: #fff;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 400;
+}
+.guest-desk-form textarea { resize: vertical; }
+.guest-desk-form .ops-button { justify-self: start; gap: 8px; }
+.guest-desk-schedule { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 9px; }
+.guest-desk-pagination { margin-top: 14px; }
+
+@media (max-width: 960px) {
+  .guest-desk-contact-details { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .guest-desk-schedule { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 760px) {
+  .guest-desk-split { grid-template-columns: 1fr; }
+  .guest-desk-list-tools { justify-content: space-between; }
+  .guest-desk-detail { scroll-margin-top: 16px; }
+}
+
+@media (max-width: 430px) {
+  .guest-desk-schedule, .guest-desk-contact-details { grid-template-columns: 1fr; }
+  .guest-desk-rows button { grid-template-columns: minmax(0, 1fr); }
+  .guest-desk-rows button > span:nth-child(2) { justify-items: start; text-align: start; }
+  .guest-desk-form .ops-button { justify-self: stretch; }
+}

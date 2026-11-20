@@ -1,0 +1,21 @@
+{
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "services": {
+    "api": {
+      "root": "apps/api",
+      "framework": "nestjs",
+      "entrypoint": "src/index.ts"
+    },
+    "web": {
+      "root": "apps/web",
+      "framework": "nextjs",
+      "devCommand": "node node_modules/next/dist/bin/next dev --hostname 127.0.0.1",
+      "bindings": [
+        { "type": "service", "service": "api", "format": "url", "env": "WOK_API_URL" }
+      ]
+    }
+  },
+  "rewrites": [
+    { "source": "/(.*)", "destination": { "service": "web" } }
+  ]
+}

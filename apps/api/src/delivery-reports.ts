@@ -24,7 +24,8 @@ export class DeliveryReportsController {
       ), requests AS (
         SELECT id, status, created_at, snapshot
         FROM delivery_orders, period
-        WHERE created_at >= ((last_day - ($1::int - 1))::timestamp AT TIME ZONE 'America/Toronto')
+        WHERE fulfillment = 'DELIVERY'
+          AND created_at >= ((last_day - ($1::int - 1))::timestamp AT TIME ZONE 'America/Toronto')
       ), delivered AS (
         SELECT * FROM requests WHERE status = 'DELIVERED'
       ), timing AS (

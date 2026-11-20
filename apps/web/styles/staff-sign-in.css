@@ -1,0 +1,107 @@
+.wc-staff-sign-in {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.06fr);
+  gap: clamp(24px, 6vw, 84px);
+  align-items: start;
+  padding-block: clamp(30px, 7vw, 100px);
+}
+
+.wc-staff-sign-in-intro {
+  padding-top: 16px;
+}
+.wc-staff-sign-in-intro .ink-seal {
+  color: var(--red-dark);
+}
+.wc-staff-sign-in-intro h1 {
+  margin: 16px 0 10px;
+  color: var(--red-dark);
+  font: 400 clamp(43px, 6vw, 76px) / 1 var(--serif);
+  letter-spacing: -0.04em;
+}
+.wc-staff-sign-in-intro p {
+  max-width: 35ch;
+  color: var(--muted);
+}
+
+.wc-staff-sign-in-panel {
+  min-width: 0;
+  padding: clamp(19px, 3vw, 36px);
+  border: 1px solid #ddcac0;
+  border-top: 3px solid var(--red-dark);
+  background: #fbf5ef;
+}
+
+.wc-staff-sign-in-panel h2 {
+  margin: 0 0 20px;
+  color: var(--red-dark);
+  font: 400 clamp(27px, 3.1vw, 40px) / 1.12 var(--serif);
+}
+
+.wc-staff-sign-in-panel > form {
+  display: grid;
+  gap: 15px;
+}
+.wc-staff-sign-in-panel label {
+  display: grid;
+  gap: 5px;
+  min-width: 0;
+  font-weight: 700;
+}
+.wc-staff-sign-in-panel input {
+  min-width: 0;
+  width: 100%;
+  min-height: 46px;
+  padding: 7px 11px;
+  border: 1px solid #c9b8ab;
+  border-radius: 0;
+  background: white;
+  color: var(--ink);
+}
+
+.wc-staff-password {
+  display: flex;
+}
+.wc-staff-password button {
+  flex: none;
+  padding-inline: 13px;
+  border: 1px solid #c9b8ab;
+  border-left: 0;
+  background: white;
+  color: var(--red-dark);
+}
+
+.wc-staff-sign-in-submit {
+  display: flex;
+  justify-content: space-between;
+  gap: 14px;
+  min-height: 46px;
+  align-items: center;
+  padding: 8px 15px;
+  border: 0;
+  background: var(--red-dark);
+  color: white;
+  font-weight: 700;
+}
+.wc-staff-sign-in-submit:hover {
+  background: #891d16;
+}
+.wc-staff-sign-in-error {
+  color: var(--red-dark);
+}
+
+.wc-staff-sign-in-reset {
+  min-height: 44px;
+  padding: 4px 0;
+  margin-top: 7px;
+  border: 0;
+  background: transparent;
+  color: var(--red-dark);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+@media (max-width: 690px) {
+  .wc-staff-sign-in {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

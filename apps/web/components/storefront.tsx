@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import Link from "next/link";
 import {
   formatMoney,
@@ -19,15 +19,24 @@ import { useCustomer } from "../lib/customer-session";
 import StoryContent from "./story-content";
 import VisitContent from "./visit-content";
 import AccountContent from "./account-content";
-import DeliveryContent from "./delivery-content";
-import { deliveryPromoKey, saveDeliverySession } from "../lib/delivery";
+import LegacyDeliveryTracking from "./delivery-content";
+import OrderChoices from "./order-choices";
+import OrderPageExtras from "./order-page-extras";
+import OrderingQuestions from "./ordering-questions";
+import { BookingSection } from "./guest-contact-forms";
+import SiteFooter from "./site-footer";
+import PickupContent from "./pickup-content";
+import PickupTracking from "./pickup-tracking";
+import { pickupCheckoutUrl, uberEatsUrl } from "../lib/ordering";
+import { pickupPromoKey, writePickupSession } from "../lib/pickup";
 import HomeContent from "./home-content";
 import FoodStories from "./food-stories";
 import FooterFeast from "./footer-feast";
 import { useScrollHeader } from "../lib/use-scroll-header";
 import HomeExtras from "./home-extras";
 import MenuContent from "./menu-content";
-import { useMenuCatalog } from "../lib/menu-catalog";
+import { getMenuCatalogSnapshot, useMenuCatalog } from "../lib/menu-catalog";
+import { canAddDish, dishOptionGroups } from "../lib/dish-options";
 import "../styles/bag.css";
 import "../styles/brand-logo.css";
 import "../styles/customer-art.css";
@@ -59,8 +68,20 @@ function Bag({ count }: { count: number }) {
 
 export default function Storefront({
   page = "home",
+  children,
 }: {
-  page?: "home" | "menu" | "story" | "visit" | "account" | "delivery";
+  page?:
+    | "home"
+    | "menu"
+    | "story"
+    | "visit"
+    | "account"
+    | "order"
+    | "pickup"
+    | "pickup-tracking"
+    | "delivery-tracking"
+    | "offers";
+  children?: ReactNode;
 }) {
   const customer = useCustomer();
   const menuItems = useMenuCatalog();
@@ -148,6 +169,7 @@ export default function Storefront({
     }
   }
   const count = cart.reduce((sum, line) => sum + line.quantity, 0);
+  const optionGroups = selected ? dishOptionGroups(selected) : [];
   const selectedTotal = selected
     ? (selected.priceCents +
         (selected.modifierGroups
@@ -171,6 +193,55 @@ export default function Storefront({
       dialog.scrollTop = 0;
     }
   }
+  function addSelection(
+    selection: Omit<CartLine, "key">,
+    combinePlain = false,
+  ) {
+    setCart((current) => {
+      const match =
+        combinePlain &&
+        current.find(
+          (line) =>
+            line.itemId === selection.itemId &&
+            !line.modifierIds?.length &&
+            !line.note &&
+            line.quantity < 20,
+        );
+      if (match)
+        return current.map((line) =>
+          line.key === match.key
+            ? { ...line, quantity: line.quantity + 1 }
+            : line,
+        );
+      if (current.length >= 40)
+        throw new Error("Your bag can hold up to 40 selections.");
+      return [...current, { ...selection, key: crypto.randomUUID() }];
+    });
+  }
+  function addMenuItem(item: MenuItem) {
+    const current = getMenuCatalogSnapshot().find(
+      (entry) => entry.id === item.id,
+    );
+    if (!current || !canAddDish(current)) {
+      setMessage("This dish is currently unavailable.");
+      return;
+    }
+    if (dishOptionGroups(current).length) {
+      openItem(current);
+      return;
+    }
+    try {
+      addSelection(
+        { itemId: current.id, quantity: 1, modifierIds: [], note: "" },
+        true,
+      );
+      setMessage(`1 × ${current.name} added to your bag.`);
+    } catch (error) {
+      setMessage(
+        error instanceof Error ? error.message : "This dish couldn’t be added.",
+      );
+    }
+  }
   function saveItem(event: React.FormEvent) {
     event.preventDefault();
     if (!selected) return;
@@ -182,8 +253,8 @@ export default function Storefront({
         note: normalizeNote(note),
       };
       priceLine(selection, menuItems);
-      setCart((current) => {
-        if (editingLine) {
+      if (editingLine) {
+        setCart((current) => {
           if (!current.some((line) => line.key === editingLine.key))
             throw new Error(
               "This selection has already been removed from your bag.",
@@ -193,11 +264,10 @@ export default function Storefront({
               ? { ...selection, key: line.key }
               : line,
           );
-        }
-        if (current.length >= 40)
-          throw new Error("Your bag can hold up to 40 selections.");
-        return [...current, { ...selection, key: crypto.randomUUID() }];
-      });
+        });
+      } else {
+        addSelection(selection);
+      }
       const preferenceSaved = writeDishPreference(
         dishPreferenceKey(selected.id, customer?.id),
         rememberOptions ? modifiers : null,
@@ -409,10 +479,10 @@ export default function Storefront({
             Menu
           </Link>
           <Link
-            href="/delivery/"
-            aria-current={page === "delivery" ? "page" : undefined}
+            href="/order/"
+            aria-current={page === "order" ? "page" : undefined}
           >
-            Delivery
+            Order online
           </Link>
           <Link
             href="/contact/"
@@ -455,19 +525,20 @@ export default function Storefront({
           Contact us
         </Link>
         <Link
-          href="/delivery/"
-          aria-current={page === "delivery" ? "page" : undefined}
+          href="/order/"
+          aria-current={page === "order" ? "page" : undefined}
         >
-          Delivery
+          Order online
         </Link>
       </nav>
       <main id="main" className={`page-${page}`}>
-        {page === "home" && <HomeContent />}
+        {page === "home" && <HomeContent items={menuItems} />}
 
         {page === "menu" && (
           <MenuContent
             items={menuItems}
-            onChoose={openItem}
+            onView={openItem}
+            onAdd={addMenuItem}
             lines={priced}
             subtotal={subtotal}
             onBag={openBag}
@@ -509,92 +580,27 @@ export default function Storefront({
             </div>
           </section>
         )}
-        {page === "home" && <FoodStories />}
+        {page === "home" && <FoodStories items={menuItems} />}
         {page === "home" && <HomeExtras />}
-        {page === "home" && <FooterFeast />}
+        {page === "home" && <FooterFeast items={menuItems} />}
         {page === "story" && <StoryContent />}
         {page === "visit" && <VisitContent />}
         {page === "account" && <AccountContent />}
-        {page === "delivery" && <DeliveryContent />}
-        {page === "menu" && (
-          <section className="menu-help">
-            <h2>A few things before you order.</h2>
-            <details>
-              <summary>Can I order without an account?</summary>
-              <p>
-                Yes. Guest checkout is the default. Your current bag stays in
-                this browser, and you can submit a test delivery without an
-                account.
-              </p>
-            </details>
-            <details>
-              <summary>Do you offer delivery?</summary>
-              <p>
-                Try the home delivery checkout with a test address, then follow
-                the order’s progress.
-              </p>
-            </details>
-            <details>
-              <summary>What about allergies?</summary>
-              <p>
-                Please speak directly to the restaurant before ordering.
-                Preparation notes cannot guarantee an allergen-free meal.
-              </p>
-            </details>
-          </section>
+        {page === "order" && (
+          <>
+            <OrderChoices items={menuItems} />
+            <OrderPageExtras items={menuItems} />
+            <BookingSection />
+          </>
         )}
+        {page === "pickup" && <PickupContent />}
+        {page === "pickup-tracking" && <PickupTracking />}
+        {page === "delivery-tracking" && <LegacyDeliveryTracking />}
+        {page === "offers" && children}
+        {(page === "menu" || page === "order") && <OrderingQuestions />}
       </main>
-      <footer className="site-footer has-ink-art">
-        <img
-          className="footer-plum-art"
-          src="/images/art/plum-branch.webp"
-          alt=""
-          aria-hidden="true"
-          width="900"
-          height="300"
-          loading="lazy"
-          decoding="async"
-        />
-        <div className="footer-top">
-          <Link
-            href="/"
-            className="footer-name brand-logo-footer"
-            aria-label="Wok and Chop home"
-          >
-            <img
-              src="/images/brand/wok-and-chop-horizontal-white.png"
-              width="900"
-              height="300"
-              alt=""
-              loading="lazy"
-            />
-          </Link>
-          <div className="footer-page-links">
-            <Link href="/menu/">Menu</Link>
-            <Link href="/delivery/#track">Track a delivery</Link>
-            <Link href="/our-story/">Our story</Link>
-            <Link href="/contact/">Contact us</Link>
-            <Link href="/account/">Your account</Link>
-          </div>
-          <p>
-            790 Kanata Ave, Unit M2A
-            <br />
-            Kanata, Ontario
-            <br />
-            Fresh • Flavorful • 100% Halal
-          </p>
-        </div>
-        <div className="footer-bottom">
-          <span>Kanata, Ontario · Hakka Chinese</span>
-          <div>
-            <Link href="/staff/">Staff console</Link>
-            <Link href="/kitchen/">Kitchen display</Link>
-            <Link href="/privacy/">Privacy</Link>
-          </div>
-          <a href="#">Back to top ↑</a>
-        </div>
-      </footer>
-      {count > 0 && page !== "delivery" && (
+      <SiteFooter hasMobileBag={count > 0 && page !== "pickup"} />
+      {count > 0 && page !== "pickup" && (
         <button className="mobile-bag" onClick={openBag}>
           <Bag count={count} />
           <strong>{formatMoney(subtotal)}</strong>
@@ -606,7 +612,9 @@ export default function Storefront({
 
       <dialog
         ref={itemDialog}
-        className="item-dialog"
+        className={
+          optionGroups.length ? "item-dialog" : "item-dialog item-dialog--plain"
+        }
         aria-labelledby="item-dialog-title"
         onClick={closeDialogs}
       >
@@ -631,8 +639,8 @@ export default function Storefront({
             <div className="dialog-content">
               <p className="sample-label">{formatMoney(selected.priceCents)}</p>
               <h2 id="item-dialog-title">{selected.name}</h2>
-              <p>{selected.description}</p>
-              {selected.modifierGroups?.map((group) => {
+              {selected.description && <p>{selected.description}</p>}
+              {optionGroups.map((group) => {
                 const radio = group.max === 1 && group.min === 1;
                 const selectedCount = group.options.filter((option) =>
                   modifiers.includes(option.id),
@@ -711,7 +719,7 @@ export default function Storefront({
                 {note.length}/240 · For allergy questions, please speak to the
                 restaurant. Your note does not guarantee an allergen-free meal.
               </p>
-              {Boolean(selected.modifierGroups?.length) && (
+              {optionGroups.length > 0 && (
                 <label className="remember-dish-options">
                   <input
                     type="checkbox"
@@ -726,6 +734,11 @@ export default function Storefront({
               {formError && (
                 <p role="alert" className="form-error">
                   {formError}
+                </p>
+              )}
+              {!canAddDish(selected) && (
+                <p className="form-error">
+                  This dish is currently unavailable.
                 </p>
               )}
               <div className="add-to-bag">
@@ -748,7 +761,11 @@ export default function Storefront({
                     +
                   </button>
                 </div>
-                <button type="submit" className="primary-button">
+                <button
+                  type="submit"
+                  className="primary-button"
+                  disabled={!canAddDish(selected)}
+                >
                   {editingLine ? "Update bag" : "Add to bag"}{" "}
                   <span>{formatMoney(selectedTotal)}</span>
                 </button>
@@ -810,8 +827,7 @@ export default function Storefront({
           </button>
         </header>
         <p className="wc-bag-availability" id="bag-availability">
-          Local delivery checkout. Test orders are saved without collecting
-          payment.
+          Your bag is for pickup at Wok &amp; Chop.
         </p>
         <div className="wc-bag-content" ref={bagBody}>
           {!cart.length ? (
@@ -859,8 +875,8 @@ export default function Storefront({
                   />
                 </svg>
                 <div>
-                  <strong>Home delivery</strong>
-                  <span>Enter your address at guest checkout</span>
+                  <strong>Pickup at Wok &amp; Chop</strong>
+                  <span>790 Kanata Ave, Unit M2A</span>
                 </div>
               </div>
               <ul className="wc-bag-lines" aria-label="Items in your bag">
@@ -1053,21 +1069,19 @@ export default function Storefront({
             </p>
             <Link
               className="wc-bag-primary"
-              href="/delivery/"
+              href={pickupCheckoutUrl}
               onClick={() => {
-                saveDeliverySession(deliveryPromoKey, promoCode);
+                writePickupSession(pickupPromoKey, promoCode);
                 closeBag();
               }}
             >
-              Continue to delivery <span aria-hidden="true">→</span>
+              Continue to pickup <span aria-hidden="true">→</span>
             </Link>
             <p className="wc-bag-guest">
               {customer
                 ? `Signed in as ${customer.name}.`
                 : "Guest checkout available."}{" "}
-              <Link href="/delivery/#track" onClick={closeBag}>
-                Track a delivery
-              </Link>
+              <a href={uberEatsUrl}>Delivery via Uber Eats ↗</a>
             </p>
           </footer>
         )}

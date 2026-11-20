@@ -10,6 +10,13 @@ dialog.item-dialog {
   scrollbar-width: thin;
   scrollbar-color: #c5bcb4 transparent;
 }
+dialog.item-dialog--plain {
+  width: 520px;
+}
+.item-dialog--plain .dialog-food-photo,
+.item-dialog--plain .dialog-food-photo.is-cutout {
+  height: clamp(117px, 23vw, 152px);
+}
 .item-dialog[open] {
   animation: dish-dialog-enter 220ms ease-out;
 }

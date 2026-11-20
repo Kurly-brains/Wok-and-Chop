@@ -1,0 +1,385 @@
+.wc-account {
+  --account-paper: #fbf6ee;
+  --account-line: #e6d9cc;
+  --account-red: var(--red-dark, #a60007);
+  width: min(100%, 1240px);
+  margin-inline: auto;
+  padding: clamp(45px, 6vw, 82px) clamp(18px, 5vw, 64px) clamp(54px, 7vw, 96px);
+}
+
+.wc-account-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px 28px;
+  flex-wrap: wrap;
+  padding-bottom: clamp(21px, 4vw, 34px);
+  margin-bottom: clamp(22px, 3vw, 36px);
+  border-bottom: 1px solid var(--account-line);
+}
+
+.wc-account-heading h1 {
+  margin: 0;
+  color: var(--account-red);
+  font: 400 clamp(42px, 6vw, 74px) / 1.03 var(--serif);
+  letter-spacing: -0.043em;
+}
+
+.wc-account-heading p {
+  margin: 8px 0 0;
+  color: var(--muted);
+  font-size: clamp(0.9rem, 1.7vw, 1rem);
+  line-height: 1.5;
+}
+
+.wc-account-heading .ink-seal {
+  align-self: center;
+  color: var(--account-red);
+}
+
+.wc-account--member {
+  --account-ink: #242420;
+  --account-line: #e9e4da;
+  padding-block: clamp(48px, 4.7vw, 57px) clamp(38px, 5.2vw, 68px);
+}
+
+.wc-account--member .wc-account-heading {
+  align-items: center;
+  gap: 8px 20px;
+  padding-bottom: 18px;
+  margin-bottom: 22px;
+}
+
+.wc-account--member .wc-account-heading > div {
+  min-width: 0;
+}
+
+.wc-account--member .wc-account-heading h1 {
+  color: var(--account-ink);
+  font: 730 clamp(32px, 4.4vw, 49px) / 1.08 var(--body);
+  letter-spacing: -0.045em;
+}
+
+.wc-account--member .wc-account-heading p {
+  margin-top: 5px;
+  overflow-wrap: anywhere;
+}
+
+.wc-account-order-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 44px;
+  color: var(--account-red);
+  font-size: 0.88rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.wc-account-order-link:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.wc-account-primary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 15px;
+  min-height: 48px;
+  padding: 9px 17px;
+  border: 1px solid var(--account-red);
+  background: var(--account-red);
+  color: white;
+  font: 700 0.9rem / 1.25 var(--body);
+  text-decoration: none;
+}
+
+.wc-account-primary:hover {
+  border-color: #7e1713;
+  background: #7e1713;
+}
+
+.wc-account-primary:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.wc-account :is(a, button, input):focus-visible {
+  outline: 2px solid var(--account-red);
+  outline-offset: 3px;
+}
+
+.wc-account-dashboard,
+.wc-account-entry {
+  display: grid;
+  align-items: start;
+  gap: clamp(18px, 4vw, 48px);
+}
+
+.wc-account-dashboard {
+  grid-template-columns: minmax(0, 1fr) minmax(236px, 0.39fr);
+  gap: clamp(23px, 3vw, 38px);
+}
+
+.wc-account-entry {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 0.95fr);
+}
+
+.wc-account h2,
+.wc-account .wc-account-auth h2 {
+  margin: 0 0 14px;
+  color: var(--account-red);
+  font: 400 clamp(25px, 3.2vw, 36px) / 1.12 var(--serif);
+  letter-spacing: -0.025em;
+}
+
+.wc-account-filters {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0 clamp(12px, 3vw, 30px);
+  margin-bottom: 16px;
+  border-bottom: 1px solid var(--account-line);
+}
+
+.wc-account-filters button {
+  min-height: 44px;
+  margin-bottom: -1px;
+  padding: 7px 1px;
+  border: 0;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--muted);
+  font: 650 0.84rem / 1.2 var(--body);
+  cursor: pointer;
+}
+
+.wc-account-filters button[aria-pressed="true"] {
+  border-bottom-color: var(--account-red);
+  color: var(--account-red);
+}
+
+.wc-account-filters button:hover {
+  color: var(--account-red);
+}
+
+.wc-account-sidebar {
+  display: grid;
+  min-width: 0;
+  gap: 18px;
+  padding-inline-start: clamp(16px, 2.4vw, 27px);
+  border-inline-start: 1px solid var(--account-line);
+}
+
+.wc-account-guest,
+.wc-account .wc-account-auth {
+  min-width: 0;
+  padding: clamp(18px, 3vw, 27px);
+  border: 1px solid var(--account-line);
+  border-radius: 0;
+}
+
+.wc-account-guest {
+  background: var(--account-paper);
+}
+
+.wc-account--member .wc-account-orders > h2,
+.wc-account-profile h2,
+.wc-account-support h2 {
+  margin: 0;
+  color: var(--account-ink);
+  font: 700 clamp(19px, 2vw, 24px) / 1.22 var(--body);
+  letter-spacing: -0.02em;
+}
+
+.wc-account--member .wc-account-orders > h2 {
+  margin-bottom: 4px;
+}
+
+.wc-account-profile-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0 12px;
+  margin-bottom: 3px;
+}
+
+.wc-account-profile dl {
+  margin: 0;
+}
+
+.wc-account-profile dl > div {
+  padding: 8px 0;
+  border-top: 1px solid var(--account-line);
+}
+
+.wc-account-profile dt {
+  color: var(--muted);
+  font-size: 0.8rem;
+}
+
+.wc-account-profile dd {
+  margin: 3px 0 0;
+  overflow-wrap: anywhere;
+  font-size: 0.93rem;
+  font-weight: 600;
+}
+
+.wc-account-profile-signout {
+  min-height: 44px;
+  border: 0;
+  padding: 4px 0;
+  background: transparent;
+  color: var(--account-red);
+  font: 650 0.8rem / 1.3 var(--body);
+  cursor: pointer;
+}
+
+.wc-account-profile-signout:hover {
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+
+.wc-account-support h2 {
+  margin-bottom: 10px;
+}
+
+.wc-account-support a,
+.wc-account-guest-tracking a {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 11px;
+  min-height: 44px;
+  padding: 10px 0;
+  border-top: 1px solid var(--account-line);
+  color: var(--account-red);
+  font-size: 0.86rem;
+  font-weight: 650;
+  line-height: 1.4;
+  text-decoration: none;
+}
+
+.wc-account-support a:hover,
+.wc-account-guest-tracking a:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.wc-account-guest {
+  display: grid;
+  gap: 20px;
+  border-top: 3px solid #aa743f;
+}
+
+.wc-account-guest p {
+  margin: 0 0 15px;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.wc-account-guest-tracking h3 {
+  margin: 0 0 7px;
+  font-size: 0.9rem;
+}
+
+.wc-account-guest > img {
+  display: block;
+  width: min(62%, 255px);
+  height: auto;
+  margin: -7px 0 -4px auto;
+  mix-blend-mode: multiply;
+  mask-image: linear-gradient(
+    to bottom,
+    transparent,
+    black 9%,
+    black 91%,
+    transparent
+  );
+}
+
+.wc-account .wc-account-auth {
+  border-top: 3px solid var(--account-red);
+  background: white;
+}
+
+.wc-account-auth .account-tabs {
+  margin-bottom: 18px;
+  gap: min(6vw, 28px);
+}
+
+.wc-account-auth .account-tabs button {
+  min-height: 44px;
+  padding: 7px 0 11px;
+  font-size: 0.88rem;
+}
+
+.wc-account-auth input {
+  min-height: 46px;
+  border-radius: 0;
+  background: #fffdfa;
+  font-size: 1rem;
+}
+
+.wc-account-auth .wc-account-primary {
+  width: 100%;
+  margin-top: 8px;
+}
+
+.wc-account-auth .password-field {
+  display: block;
+  margin: 0;
+}
+
+.wc-account-auth .password-field button {
+  right: 4px;
+  min-width: 46px;
+  font-size: 0.8rem;
+}
+
+.wc-account-auth .field-hint {
+  margin-top: 12px;
+  line-height: 1.55;
+}
+
+.wc-account-auth .account-forgot-password {
+  margin-bottom: 0;
+}
+
+@media (max-width: 760px) {
+  .wc-account-dashboard,
+  .wc-account-entry {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .wc-account--member {
+    padding-block-start: 28px;
+  }
+
+  .wc-account-sidebar {
+    padding: 12px 0 0;
+    border-inline-start: 0;
+    border-top: 1px solid var(--account-line);
+    gap: 14px;
+  }
+
+  .wc-account-guest {
+    gap: 15px;
+  }
+
+  .wc-account-guest > img {
+    display: none;
+  }
+}
+
+@media (max-width: 420px) {
+  .wc-account-heading .ink-seal {
+    display: none;
+  }
+
+  .wc-account-filters button {
+    font-size: 0.77rem;
+  }
+}

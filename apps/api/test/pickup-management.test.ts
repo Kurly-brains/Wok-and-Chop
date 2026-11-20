@@ -1,0 +1,187 @@
+import assert from "node:assert/strict";
+import { randomUUID } from "node:crypto";
+import test from "node:test";
+import { Pool } from "pg";
+import { createApplication } from "../src/app";
+import { hash } from "../src/order-input";
+
+const databaseUrl = process.env.AUTH_TEST_DATABASE_URL;
+const origin = "http://127.0.0.1:3000";
+const basket = { lines: [{ itemId: "lunch-chilli-chicken", quantity: 1, modifierIds: ["lunch-jasmine-rice", "lunch-soup-of-day", "lunch-dry"], note: "Synthetic receipt instruction" }], promoCode: "" };
+
+test("manager pickup edits are versioned, reversible, private, and preserve authoritative receipts", { skip: !databaseUrl }, async () => {
+  if (new URL(databaseUrl!).pathname !== "/wok_chop_auth_test") throw new Error("Dedicated test database required");
+  const db = new Pool({ connectionString: databaseUrl });
+  const app = await createApplication({ authDatabaseUrl: databaseUrl, webOrigin: origin });
+  const emails: string[] = [];
+  const requestHashes: string[] = [];
+  try {
+    await app.listen(0, "127.0.0.1");
+    const base = `${await app.getUrl()}/v1/auth/`;
+    const post = (path: string, body: unknown, cookie?: string, requestOrigin = origin) => fetch(base + path, {
+      method: "POST", headers: { Origin: requestOrigin, "Content-Type": "application/json", ...(cookie ? { Cookie: cookie } : {}) }, body: JSON.stringify(body),
+    });
+    const get = (path: string, cookie?: string) => fetch(base + path, { headers: cookie ? { Cookie: cookie } : {} });
+    async function register(manager = false) {
+      const email = `management-${randomUUID()}@example.invalid`;
+      emails.push(email);
+      const response = await post("register", { name: "Synthetic staff fixture", email, password: "Synthetic test password!" });
+      assert.equal(response.status, 201);
+      const { user } = await response.json();
+      if (manager) await db.query("INSERT INTO restaurant_managers(account_id) VALUES($1)", [user.id]);
+      return { id: user.id as string, cookie: response.headers.getSetCookie()[0].split(";")[0] };
+    }
+    const manager = await register(true), secondManager = await register(true), customer = await register();
+    const quoteResponse = await post("pickups/quote", basket);
+    assert.equal(quoteResponse.status, 200);
+    const quote = await quoteResponse.json();
+    const guestEmail = `management-guest-${randomUUID()}@example.invalid`;
+    emails.push(guestEmail);
+    function body() {
+      const requestId = randomUUID();
+      requestHashes.push(hash("pickup-request-v1:" + requestId));
+      return { ...basket, requestId, name: "Synthetic Guest", phone: "6135550108", email: guestEmail, expectedTotalCents: quote.totalCents, quoteFingerprint: quote.quoteFingerprint, expectedAccountId: null };
+    }
+    const request = body();
+    assert.equal((await post("admin/pickups", request)).status, 401);
+    assert.equal((await post("admin/pickups", request, customer.cookie)).status, 403);
+    assert.equal((await post("admin/pickups", request, manager.cookie, "https://untrusted.example.invalid")).status, 403);
+    assert.equal((await post("admin/pickups", { ...request, expectedAccountId: customer.id }, manager.cookie)).status, 400);
+    assert.equal((await post("admin/pickups", { ...request, expectedTotalCents: 1 }, manager.cookie)).status, 409);
+    const created = await post("admin/pickups", request, manager.cookie);
+    assert.equal(created.status, 201);
+    const receipt = await created.json();
+    assert.equal(receipt.pickup.totalCents, quote.totalCents);
+    assert.deepEqual(receipt.pickup.statusHistory.map((event: {status: string}) => event.status), ["RECEIVED"]);
+    const row = (await db.query("SELECT customer_account_id,created_by_manager_id,snapshot FROM delivery_orders WHERE id=$1", [receipt.pickup.id])).rows[0];
+    assert.equal(row.customer_account_id, null);
+    assert.equal(row.created_by_manager_id, manager.id);
+    assert.deepEqual(await (await post("admin/pickups", request, manager.cookie)).json(), receipt);
+    assert.equal((await post("admin/pickups", request, secondManager.cookie)).status, 409);
+    assert.equal((await post("pickups", request)).status, 409);
+    assert.equal((await (await get("pickups/mine", manager.cookie)).json()).pickups.length, 0);
+    const emailCount = async () => (await db.query("SELECT count(*)::int AS count FROM notification_emails WHERE recipient=$1", [guestEmail])).rows[0].count;
+    assert.equal(await emailCount(), 1);
+    const queue = await (await get("admin/deliveries", manager.cookie)).json();
+    let order = queue.deliveries.find((item: { id: string }) => item.id === receipt.pickup.id);
+    assert.equal(order.createdByManager, true);
+    assert.equal(order.archived, false);
+    assert.equal(order.archivedAt, null);
+    assert.equal(order.managerNote, "");
+    assert.equal(order.canUndoStatus, false);
+    assert.equal(order.undoTargetStatus, null);
+    const route = `admin/deliveries/${order.id}`;
+    const mutate = (action: string, input: object, version: number = order.version, cookie: string = manager.cookie) => post(`${route}/${action}`, { ...input, expectedVersion: version }, cookie);
+    async function update(action: string, input: object) {
+      const response = await mutate(action, input);
+      assert.equal(response.status, 200, await response.clone().text());
+      order = (await response.json()).delivery;
+      return order;
+    }
+    for (const [action, payload] of [["note", { note: "staff only" }], ["undo", { reason: "Correction" }], ["archive", { archived: true }]] as const) {
+      assert.equal((await post(`${route}/${action}`, { ...payload, expectedVersion: 1 })).status, 401);
+      assert.equal((await mutate(action, payload, 1, customer.cookie)).status, 403);
+      assert.equal((await post(`${route}/${action}`, { ...payload, expectedVersion: 1 }, manager.cookie, "https://untrusted.example.invalid")).status, 403);
+      assert.equal((await mutate(action, payload, 2147483647)).status, 400);
+    }
+    assert.equal((await mutate("archive", { archived: true })).status, 409);
+    assert.equal((await mutate("undo", { reason: "No previous status" })).status, 409);
+    assert.equal((await mutate("note", { note: "x".repeat(1001) })).status, 400);
+    assert.equal((await mutate("note", { note: "x\u0000" })).status, 400);
+    assert.equal((await mutate("note", { note: "x", snapshot: {} })).status, 400);
+    assert.equal((await mutate("undo", { reason: " " })).status, 400);
+    assert.equal((await mutate("undo", { reason: "x".repeat(501) })).status, 400);
+    assert.equal((await mutate("archive", { archived: "yes" })).status, 400);
+    await update("note", { note: "  Internal follow-up\r\nSecond line\tfixture  " });
+    assert.equal(order.managerNote, "Internal follow-up\nSecond line\tfixture");
+    assert.equal(order.version, 2);
+    assert.equal(order.updatedAt, receipt.pickup.updatedAt);
+    assert.equal(order.statusHistory.length, 1);
+    assert.equal(await emailCount(), 1);
+    const competing = await Promise.all([mutate("note", { note: "Concurrent A" }), mutate("note", { note: "Concurrent B" })]);
+    assert.deepEqual(competing.map(response => response.status).sort(), [200, 409]);
+    order = (await competing.find(response => response.status === 200)!.json()).delivery;
+    const finalNote = order.managerNote;
+    await update("status", { status: "CANCELLED" });
+    assert.equal(order.canUndoStatus, true);
+    assert.equal(order.undoTargetStatus, "RECEIVED");
+    await update("note", { note: finalNote });
+    assert.equal(order.undoTargetStatus, "RECEIVED");
+    await update("undo", { reason: "  Accidental cancellation\r\nGuest is collecting  " });
+    assert.equal(order.status, "RECEIVED");
+    assert.equal(order.canUndoStatus, false);
+    assert.equal(order.undoTargetStatus, null);
+    assert.equal((await mutate("undo", { reason: "Repeated correction" })).status, 409);
+    assert.equal(order.auditHistory.at(-1).action, "UNDO");
+    assert.equal(order.auditHistory.at(-1).reason, "Accidental cancellation\nGuest is collecting");
+    assert.deepEqual(order.statusHistory.map((event: {status: string}) => event.status), ["RECEIVED", "CANCELLED", "RECEIVED"]);
+    for (const status of ["PREPARING", "READY_FOR_PICKUP", "PICKED_UP"]) await update("status", { status });
+    assert.equal(order.undoTargetStatus, "READY_FOR_PICKUP");
+    const beforeArchive = await emailCount();
+    const collectedAt = order.updatedAt;
+    await update("archive", { archived: true });
+    assert.equal(order.archived, true);
+    assert.ok(Number.isFinite(Date.parse(order.archivedAt)));
+    assert.equal(order.canUndoStatus, false);
+    assert.equal((await mutate("undo", { reason: "Not restored" })).status, 409);
+    assert.equal((await mutate("status", { status: "CANCELLED" })).status, 409);
+    await update("note", { note: "Completed record follow-up" });
+    assert.equal(await emailCount(), beforeArchive);
+    for (const scope of ["active", "history"]) {
+      const list = await (await get(`admin/deliveries?scope=${scope}`, manager.cookie)).json();
+      assert.ok(!list.deliveries.some((item: {id: string}) => item.id === order.id));
+    }
+    const archived = await (await get("admin/deliveries?scope=archived", manager.cookie)).json();
+    assert.ok(archived.deliveries.some((item: {id: string}) => item.id === order.id));
+    const tracked = await (await post("pickups/track", { trackingToken: receipt.trackingToken })).json();
+    assert.equal(tracked.pickup.status, "PICKED_UP");
+    assert.doesNotMatch(JSON.stringify(tracked), /managerNote|archived|createdByManager|auditHistory|Internal|follow-up|managerId/);
+    await update("archive", { archived: false });
+    assert.equal(order.archivedAt, null);
+    assert.equal(order.managerNote, "Completed record follow-up");
+    assert.equal(order.updatedAt, collectedAt);
+    assert.equal(order.undoTargetStatus, "READY_FOR_PICKUP");
+    await update("undo", { reason: "Collection marked too soon" });
+    assert.equal(order.status, "READY_FOR_PICKUP");
+    assert.equal(order.canUndoStatus, false);
+    await update("status", { status: "PICKED_UP" });
+    await update("archive", { archived: true });
+    const committedVersion = order.version;
+    await update("archive", { archived: true });
+    assert.equal(order.version, committedVersion);
+    assert.equal((await mutate("note", { note: "stale" }, 1)).status, 409);
+    const replay = await (await post("admin/pickups", request, manager.cookie)).json();
+    assert.equal(replay.pickup.version, order.version);
+    assert.equal(replay.trackingToken, receipt.trackingToken);
+    assert.deepEqual((await db.query("SELECT snapshot FROM delivery_orders WHERE id=$1", [order.id])).rows[0].snapshot, row.snapshot);
+    await assert.rejects(db.query("UPDATE delivery_orders SET snapshot='{}'::jsonb WHERE id=$1", [order.id]), /immutable/);
+    const notices = (await db.query("SELECT body,status FROM notification_emails WHERE recipient=$1", [guestEmail])).rows;
+    assert.ok(notices.every(notice => notice.status === "PREVIEW"));
+    assert.equal(notices.filter(notice => notice.body.startsWith("The restaurant corrected your pickup status.")).length, 2);
+    assert.ok(notices.every(notice => !notice.body.includes("Completed record") && !notice.body.includes(receipt.trackingToken)));
+    const events = (await db.query("SELECT action,version,manager_id FROM delivery_order_events WHERE order_id=$1 ORDER BY version", [order.id])).rows;
+    assert.equal(events.length, order.version);
+    assert.ok(events.every(event => event.manager_id === manager.id));
+    assert.ok(events.some(event => event.action === "RESTORE"));
+    const accountRequest = { ...body(), expectedAccountId: customer.id };
+    const accountCreated = await post("pickups", accountRequest, customer.cookie);
+    assert.equal(accountCreated.status, 201);
+    const accountOrder = (await accountCreated.json()).pickup;
+    assert.equal((await post(`admin/deliveries/${accountOrder.id}/status`, { status: "CANCELLED", expectedVersion: 1 }, manager.cookie)).status, 200);
+    assert.equal((await post(`admin/deliveries/${accountOrder.id}/archive`, { archived: true, expectedVersion: 2 }, manager.cookie)).status, 200);
+    const mine = await (await get("pickups/mine", customer.cookie)).json();
+    assert.ok(mine.pickups.some((item: {id: string}) => item.id === accountOrder.id));
+    assert.doesNotMatch(JSON.stringify(mine), /managerNote|archived|auditHistory/);
+    await db.query("DELETE FROM restaurant_managers WHERE account_id=$1", [manager.id]);
+    assert.equal((await mutate("note", { note: "revoked" })).status, 403);
+    assert.equal((await get("admin/deliveries?scope=archived", manager.cookie)).status, 403);
+  } finally {
+    const fixtures = (await db.query("SELECT 'P-'||order_number AS number FROM delivery_orders WHERE request_hash=ANY($1::text[])", [requestHashes])).rows;
+    const subjects = fixtures.flatMap(({number}) => [`New Wok & Chop pickup ${number}`, `Cancelled Wok & Chop pickup ${number}`]);
+    await db.query("DELETE FROM notification_emails WHERE recipient=ANY($1::text[]) OR subject=ANY($2::text[])", [emails, subjects]);
+    await db.query("DELETE FROM delivery_orders WHERE request_hash=ANY($1::text[])", [requestHashes]);
+    await db.query("DELETE FROM customer_accounts WHERE email_normalized=ANY($1::text[])", [emails]);
+    await app.close();
+    await db.end();
+  }
+});

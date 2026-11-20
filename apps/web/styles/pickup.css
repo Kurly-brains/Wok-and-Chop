@@ -1,0 +1,344 @@
+.pickup-checkout {
+  width: min(1120px, calc(100% - 48px));
+  margin-inline: auto;
+  padding: clamp(46px, 6vw, 86px) 0 clamp(54px, 7vw, 96px);
+}
+
+.pickup-header {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  margin-bottom: clamp(22px, 4vw, 40px);
+}
+
+.pickup-back {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  color: var(--red-dark);
+  font-size: .85rem;
+  font-weight: 700;
+  text-underline-offset: 4px;
+}
+
+.pickup-header h1 {
+  margin: 0;
+  color: var(--red-dark);
+  font: 400 clamp(2.55rem, 6vw, 4.8rem)/1 var(--serif);
+  letter-spacing: -.045em;
+}
+
+.pickup-header p {
+  margin: 4px 0 0;
+  color: var(--muted);
+}
+
+.pickup-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(270px, 1fr);
+  gap: clamp(18px, 4vw, 40px);
+  align-items: start;
+}
+
+.pickup-main {
+  display: grid;
+  gap: 18px;
+}
+
+.pickup-card {
+  display: flow-root;
+  min-width: 0;
+  padding: clamp(18px, 3vw, 30px);
+  border: 1px solid var(--line);
+  background: var(--paper);
+}
+
+.pickup-layout--review {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+.pickup-review-grid {
+  display: grid;
+  grid-template: "details totals" auto
+                 "actions totals" 1fr / minmax(0, 1.45fr) minmax(270px, 1fr);
+  align-items: start;
+  gap: 12px clamp(18px, 4vw, 40px);
+}
+
+.pickup-review-details {
+  grid-area: details;
+  min-width: 0;
+}
+
+.pickup-review-grid .pickup-summary {
+  grid-area: totals;
+}
+
+.pickup-review-footer {
+  grid-area: actions;
+  min-width: 0;
+}
+
+.pickup-card h2 {
+  margin: 0 0 12px;
+  font: 400 clamp(1.45rem, 2.75vw, 2.2rem)/1.12 var(--serif);
+}
+
+.pickup-card h2:focus {
+  outline: none;
+}
+
+.pickup-card p {
+  margin: 0;
+}
+
+.pickup-location {
+  display: grid;
+  gap: 3px;
+  margin: 0 0 17px;
+  padding: 12px 14px 6px;
+  border-inline-start: 2px solid var(--red);
+  background: #fbf7f4;
+}
+
+.pickup-location address {
+  font-style: normal;
+  color: var(--muted);
+}
+
+.pickup-location a,
+.pickup-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 5px;
+  width: fit-content;
+  min-height: 44px;
+  color: var(--red-dark);
+  font-size: .83rem;
+  font-weight: 700;
+  text-underline-offset: 4px;
+}
+
+.pickup-form {
+  display: grid;
+  justify-items: start;
+  gap: 14px;
+}
+
+.pickup-fields {
+  display: grid;
+  width: 100%;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.pickup-form label {
+  display: block;
+  min-width: 0;
+  font-size: .825rem;
+  font-weight: 700;
+}
+
+.pickup-checkout input {
+  display: block;
+  width: 100%;
+  min-height: 44px;
+  margin-top: 6px;
+  padding: 9px 10px;
+  border: 1px solid #cfc6bc;
+  border-radius: 0;
+  background: #fff;
+  color: var(--ink);
+  font: 400 1rem/1.35 var(--body);
+}
+
+.pickup-promo,
+.pickup-private-code {
+  width: min(100%, 24rem);
+}
+
+.pickup-promo summary,
+.pickup-private-code summary {
+  min-height: 44px;
+  align-content: center;
+  color: var(--red-dark);
+  font-size: .87rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pickup-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+  margin-top: 17px;
+}
+
+.pickup-primary,
+.pickup-secondary {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  min-height: 44px;
+  padding: 10px 15px;
+  border: 1px solid var(--red-dark);
+  background: var(--red-dark);
+  color: #fff;
+  font: 700 .86rem/1.3 var(--body);
+  text-decoration: none;
+}
+
+.pickup-secondary {
+  background: var(--paper);
+  color: var(--red-dark);
+}
+
+.pickup-primary:hover {
+  background: var(--red);
+}
+
+.pickup-secondary:hover {
+  background: #fbf7f4;
+}
+
+.pickup-primary:disabled,
+.pickup-secondary:disabled {
+  opacity: .5;
+  cursor: default;
+}
+
+.pickup-card > .pickup-primary,
+.pickup-card > .pickup-secondary,
+.pickup-private-code .pickup-secondary {
+  margin-top: 12px;
+}
+
+.pickup-summary {
+  background: #fdfaf8;
+}
+
+.pickup-summary ul,
+.pickup-summary dl,
+.pickup-contact-list {
+  margin: 0;
+  padding: 0;
+}
+
+.pickup-summary ul {
+  margin-bottom: 8px;
+  list-style: none;
+  border-bottom: 1px solid var(--line);
+}
+
+.pickup-summary li,
+.pickup-summary dl > div,
+.pickup-contact-list > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 0;
+  font-size: .87rem;
+}
+
+.pickup-summary li + li,
+.pickup-summary dl .pickup-total,
+.pickup-contact-list > div + div {
+  border-top: 1px solid var(--line);
+}
+
+.pickup-summary li div {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.pickup-summary li small {
+  display: block;
+  margin-top: 3px;
+}
+
+.pickup-summary li > span,
+.pickup-summary dd {
+  flex: none;
+  margin: 0;
+}
+
+.pickup-summary small,
+.pickup-note,
+.pickup-contact-list dt {
+  color: var(--muted);
+}
+
+.pickup-summary .pickup-total {
+  color: var(--red-dark);
+  font-size: 1rem;
+  font-weight: 700;
+}
+
+.pickup-contact-list dd {
+  min-width: 0;
+  margin: 0;
+  font-weight: 600;
+  text-align: end;
+  overflow-wrap: anywhere;
+}
+
+.pickup-card .pickup-note,
+.pickup-card .pickup-error {
+  margin-top: 8px;
+  font-size: .82rem;
+}
+
+.pickup-card .pickup-error,
+.pickup-card .pickup-receipt-number {
+  color: var(--red-dark);
+  font-weight: 700;
+}
+
+.pickup-confirmation .pickup-location {
+  margin-top: 15px;
+}
+
+#track-pickup {
+  scroll-margin-top: 100px;
+}
+
+.pickup-code {
+  overflow-wrap: anywhere;
+  font: .85rem/1.5 monospace;
+}
+
+.pickup-sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .pickup-checkout {
+    width: calc(100% - 36px);
+    padding-top: 22px;
+  }
+
+  .pickup-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .pickup-review-grid {
+    grid-template: "details" auto
+                   "totals" auto
+                   "actions" auto / minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 475px) {
+  .pickup-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

@@ -1,11 +1,12 @@
 "use client";
 import { useEffect, useSyncExternalStore } from "react";
-import { buildCatalog, byteLength, defaultCatalog, MAX_MENU_STORAGE_BYTES, validatePatch, type MenuCatalogItem, type MenuItemPatch, type Overrides } from "@wok/domain";
+import { buildCatalog, byteLength, createCustomMenuItem, defaultCatalog, MAX_MENU_STORAGE_BYTES, validateNewMenuItem, validatePatch, type MenuCatalogItem, type MenuItemPatch, type NewMenuItem, type Overrides } from "@wok/domain";
 import { API_URL } from "./customer-session";
 export { MAX_MENU_IMAGE_BYTES, MAX_MENU_STORAGE_BYTES, type MenuCatalogItem, type CatalogMenuItem, type MenuItemPatch } from "@wok/domain";
 
 export const MENU_CATALOG_STORAGE_KEY = "wok-chop-preview-menu-v1";
 export const MENU_CATALOG_CHANGED_EVENT = "wok-menu-catalog-changed";
+const PUBLISHED_MENU_SIGNAL_KEY = "wok-chop-published-menu-version";
 const STORAGE_VERSION = 1;
 let cachedRaw: string | null | undefined;
 let cachedCatalog = defaultCatalog;
@@ -43,6 +44,7 @@ export function subscribeMenuCatalog(callback: () => void): () => void {
   if (typeof window === "undefined") return () => {};
   const onStorage = (event: StorageEvent) => {
     if (event.key === MENU_CATALOG_STORAGE_KEY || event.key === null) callback();
+    if (event.key === PUBLISHED_MENU_SIGNAL_KEY) void refreshPublishedMenu();
   };
   window.addEventListener(MENU_CATALOG_CHANGED_EVENT, callback);
   window.addEventListener("storage", onStorage);
@@ -56,17 +58,26 @@ export function getMenuCatalogSnapshot(): readonly MenuCatalogItem[] {
   return publishedCatalog ?? getDraftMenuSnapshot();
 }
 
+export function getPublishedMenuVersion() {
+  return publishedVersion;
+}
+
 export function refreshPublishedMenu(): Promise<boolean> {
   if (refreshPending) return refreshPending;
   refreshPending = (async () => {
     try {
       const response = await fetch(`${API_URL}/v1/menu?after=${publishedVersion}`, { cache: "no-store" });
       if (!response.ok) return false;
-      const data = await response.json() as { version: number; overrides: Overrides | null };
+      const data = await response.json() as { version: number; overrides: Overrides | null; customItems?: MenuCatalogItem[] | null };
       if (!Number.isSafeInteger(data.version) || data.version < 1) return false;
       if (data.overrides && typeof data.overrides === "object" && !Array.isArray(data.overrides)) {
         const overrides = Object.fromEntries(Object.entries(data.overrides).map(([id, patch]) => [id, validatePatch(patch)]));
-        publishedCatalog = buildCatalog(overrides);
+        const customItems = (data.customItems ?? []).map(({ id, ...fields }) => {
+          delete fields.fixture;
+          delete fields.modifierGroups;
+          return createCustomMenuItem(id, validateNewMenuItem(fields));
+        });
+        publishedCatalog = buildCatalog(overrides, customItems);
         publishedVersion = data.version;
         window.dispatchEvent(new Event(MENU_CATALOG_CHANGED_EVENT));
       }
@@ -96,7 +107,7 @@ export function useMenuCatalog(): readonly MenuCatalogItem[] {
   return useSyncExternalStore(subscribeMenuCatalog, getMenuCatalogSnapshot, () => defaultCatalog);
 }
 
-async function updatePublishedMenu(route: string, change: Record<string, unknown>) {
+async function updatePublishedMenu<T>(route: string, change: Record<string, unknown>) {
   if (!publishedVersion) throw new Error("Connect the local menu service before publishing.");
   const response = await fetch(`${API_URL}/v1/auth/admin/menu/${route}`, {
     method: "POST",
@@ -109,11 +120,21 @@ async function updatePublishedMenu(route: string, change: Record<string, unknown
     if (response.status === 409) await refreshPublishedMenu();
     throw new Error(typeof error?.message === "string" ? error.message : "The menu could not be published.");
   }
+  const result = await response.json() as T;
   // A read already in flight may have started before the write was committed.
   if (refreshPending) await refreshPending;
   if (!await refreshPublishedMenu()) {
     throw new Error("Your changes were saved. Reload the page to see the published menu.");
   }
+  try { window.localStorage.setItem(PUBLISHED_MENU_SIGNAL_KEY, String(publishedVersion)); } catch { /* Other tabs still poll. */ }
+  return result;
+}
+
+export async function createPublishedMenuItem(item: NewMenuItem, expectedVersion: number, requestId: string): Promise<MenuCatalogItem> {
+  const result = await updatePublishedMenu<{ item: MenuCatalogItem }>("items", { item: validateNewMenuItem(item), expectedVersion, requestId });
+  const saved = getMenuCatalogSnapshot().find(entry => entry.id === result.item.id);
+  if (!saved) throw new Error("The dish was published. Refresh the menu to see it.");
+  return saved;
 }
 
 export async function publishMenuItem(id: string, patch: MenuItemPatch): Promise<MenuCatalogItem> {

@@ -89,6 +89,11 @@
   filter: drop-shadow(0 12px 9px #41180f25);
   transform: rotate(-7deg);
 }
+.food-story-art > img[data-image="photo"] {
+  aspect-ratio: 1;
+  border-radius: 50%;
+  object-fit: cover;
+}
 .food-story-card:nth-child(even) .food-story-art > img {
   transform: rotate(6deg);
 }

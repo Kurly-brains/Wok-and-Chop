@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { setCookiePreference, useCookiePreference } from "../lib/cookie-preferences";
 import {
   googleReviews,
   googleReviewListing,
@@ -70,6 +71,7 @@ function GuestAvatar({ src, name }: { src?: string; name: string }) {
 }
 
 export default function GuestReviews() {
+  const showPhotos = useCookiePreference() === "external";
   const trackRef = useRef<HTMLDivElement>(null);
   const [range, setRange] = useState({
     first: 0,
@@ -203,14 +205,14 @@ export default function GuestReviews() {
             key={review.url}
             aria-label={`Review ${index + 1} of ${googleReviews.length} by ${review.name}`}
           >
-            <GuestPhoto src={review.photo} alt={review.photoAlt} />
+            {showPhotos && <GuestPhoto src={review.photo} alt={review.photoAlt} />}
             <div className="guest-review-author">
               <div className="guest-review-byline">
-                <GuestAvatar src={review.avatar} name={review.name} />
+                <GuestAvatar src={showPhotos ? review.avatar : undefined} name={review.name} />
                 <div>
                   <h3>{review.name}</h3>
                   <p className="guest-review-source">
-                    Photo and review on Google
+                    {showPhotos ? "Photo and review on Google" : "Review on Google"}
                   </p>
                 </div>
               </div>
@@ -246,6 +248,11 @@ export default function GuestReviews() {
       <div className="guest-reviews-footer">
         <div className="guest-reviews-footer-note">
           <p>Selected excerpts from public Google reviews.</p>
+          {!showPhotos && (
+            <button className="guest-reviews-load-photos" type="button" onClick={() => setCookiePreference("external")}>
+              Load review photos from Google
+            </button>
+          )}
         </div>
         <a
           className="guest-review-link"

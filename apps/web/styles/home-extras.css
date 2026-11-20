@@ -3,104 +3,12 @@
   color: var(--ink);
 }
 
-.wc-home-pickup {
-  width: 100%;
-  margin: 0;
-  padding: 0 0 44px;
-}
-
-.wc-home-pickup-composition {
-  width: min(1280px, 88%);
-  margin: 0 auto;
-  display: grid;
-  grid-template-columns: 1.04fr 1fr;
-  align-items: center;
-  gap: 6.5%;
-  padding-top: 32px;
-}
-
-.wc-home-kitchen-art {
-  width: min(100%, 430px);
-  aspect-ratio: 1;
-  justify-self: center;
-  min-width: 0;
-  margin: 0;
-}
-
-.wc-home-kitchen-art img {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: contain;
-}
-
 .wc-home-extras h2 {
   font-family: var(--serif);
   font-weight: 400;
   font-size: clamp(37px, 4.1vw, 57px);
   letter-spacing: -1.5px;
   line-height: 1.08;
-}
-
-.wc-home-extras h2 strong {
-  font-family: var(--body);
-  font-weight: 700;
-  font-size: .88em;
-  letter-spacing: -1.8px;
-}
-
-.wc-home-pickup-copy h2 strong {
-  color: var(--red);
-}
-
-.wc-home-pickup-intro {
-  font-size: 13px;
-  line-height: 1.7;
-  margin: 13px 0 16px;
-  color: var(--muted);
-}
-
-.wc-home-pickup-list {
-  list-style: none;
-  display: grid;
-  gap: 14px;
-  margin: 0;
-  padding: 0;
-}
-
-.wc-home-pickup-list li {
-  display: flex;
-  align-items: baseline;
-  gap: 17px;
-}
-
-.wc-home-pickup-list li > span {
-  font-family: var(--serif);
-  font-size: 19px;
-  color: var(--red);
-  min-width: 25px;
-}
-
-.wc-home-pickup-list h3 {
-  font-family: var(--body);
-  font-size: 13px;
-  line-height: 1.4;
-  font-weight: 700;
-  margin: 0 0 4px;
-}
-
-.wc-home-pickup-list p {
-  font-size: 12px;
-  color: var(--muted);
-  line-height: 1.6;
-}
-
-.wc-home-pickup-status {
-  max-width: 355px;
-  margin: 16px 0 6px;
-  font-size: 10px;
-  line-height: 1.65;
-  color: var(--muted);
 }
 
 .wc-home-editorial-link {
@@ -178,22 +86,12 @@
 }
 
 @media (max-width: 1050px) {
-  .wc-home-pickup-composition { gap: 4.5%; }
-  .wc-home-kitchen-art { max-width: 380px; }
   .wc-home-location-inner { gap: 24px; }
   .wc-home-location-details address { font-size: 20px; }
 }
 
 @media (max-width: 760px) {
-  .wc-home-pickup { padding-bottom: 26px; }
-  .wc-home-pickup-composition { width: auto; margin: 0 24px; grid-template-columns: 1fr; gap: 18px; padding-top: 20px; }
-  .wc-home-kitchen-art { width: min(78%, 270px); }
   .wc-home-extras h2 { font-size: clamp(39px, 9vw, 51px); letter-spacing: -1.1px; }
-  .wc-home-extras h2 strong { letter-spacing: -1.4px; }
-  .wc-home-pickup-intro { font-size: 12px; margin: 12px 0 16px; }
-  .wc-home-pickup-list { gap: 13px; }
-  .wc-home-pickup-list li { gap: 14px; }
-  .wc-home-pickup-status { max-width: 350px; margin-top: 15px; }
   .wc-home-location { padding: 9px 0; }
   .wc-home-location-inner { width: auto; margin: 0 24px; flex-direction: column; align-items: flex-start; gap: 20px; padding: 20px 0 22px; }
   .wc-home-location h2 { font-size: clamp(35px, 8.4vw, 46px); }
@@ -203,7 +101,6 @@
 }
 
 @media (max-width: 380px) {
-  .wc-home-pickup-composition { margin-inline: 20px; }
   .wc-home-location-inner { margin-inline: 20px; }
   .wc-home-location h2 { font-size: 34px; }
   .wc-home-location-links { gap: 12px 20px; }

@@ -6,7 +6,7 @@ import { fetchCustomerOrders } from "./customer-orders";
 type PublicUser = { id: string; name: string; email: string };
 type AccountRow = { id: string; display_name: string; email_normalized: string; password_hash: string };
 type RequestLike = { headers: Record<string, string | string[] | undefined>; socket: { remoteAddress?: string } };
-type ResponseLike = { setHeader(name: string, value: string): unknown };
+type ResponseLike = { setHeader(name: string, value: string | string[]): unknown };
 const COOKIE_NAME = "wok_customer_session";
 const SESSION_SECONDS = 7 * 24 * 60 * 60;
 const SCRYPT_COST = 32768;
@@ -24,7 +24,7 @@ function derive(password: string, salt: Buffer): Promise<Buffer> {
   });
 }
 
-async function hashPassword(password: string) {
+export async function hashPassword(password: string) {
   const salt = randomBytes(16);
   const key = await derive(password, salt);
   return `scrypt$${SCRYPT_COST}$8$1$${salt.toString("hex")}$${key.toString("hex")}`;
@@ -47,9 +47,28 @@ function cookieToken(request: RequestLike) {
   const value = raw.split(";").map((part) => part.trim()).find((part) => part.startsWith(`${COOKIE_NAME}=`))?.slice(COOKIE_NAME.length + 1);
   return value && /^[a-f0-9]{64}$/.test(value) ? value : null;
 }
-function sessionCookie(token: string, maxAge = SESSION_SECONDS) {
+function sessionCookies(token: string, maxAge = SESSION_SECONDS): string[] {
   // This service binds only to loopback and refuses production. HTTPS deployment must add Secure.
-  return `${COOKIE_NAME}=${token}; HttpOnly; SameSite=Lax; Path=/v1/auth; Max-Age=${maxAge}`;
+  // Issue root-scoped cookies for the staff SSR gate and remove the older API-only cookie.
+  const expired = "; Expires=Thu, 01 Jan 1970 00:00:00 GMT";
+  return [
+    `${COOKIE_NAME}=${token}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${maxAge}${maxAge === 0 ? expired : ""}`,
+    `${COOKIE_NAME}=; HttpOnly; SameSite=Lax; Path=/v1/auth; Max-Age=0${expired}`,
+  ];
+}
+
+export function normalizeAccountEmail(value: unknown) {
+  const email = typeof value === "string" ? value.trim().toLowerCase() : "";
+  if (email.length > 254 || !/^[^\s@\u0000-\u001f\u007f]+@[^\s@\u0000-\u001f\u007f]+\.[^\s@\u0000-\u001f\u007f]+$/.test(email)) failure(400, "INVALID_EMAIL", "Enter a valid email address.");
+  return email;
+}
+
+export function validateAccountPassword(value: unknown, newPassword: boolean) {
+  const password = typeof value === "string" ? value : "";
+  if (password.length < (newPassword ? 12 : 1) || password.length > 128 || Buffer.byteLength(password, "utf8") > 512) {
+    failure(400, "INVALID_PASSWORD", newPassword ? "Use a password with 12 to 128 characters." : "Enter your password.");
+  }
+  return password;
 }
 
 function credentials(body: unknown, registration: boolean) {
@@ -57,12 +76,8 @@ function credentials(body: unknown, registration: boolean) {
   const data = body as Record<string, unknown>;
   const allowed = registration ? ["name", "email", "password"] : ["email", "password"];
   if (Object.keys(data).some((key) => !allowed.includes(key))) failure(400, "INVALID_INPUT", "Unexpected account fields.");
-  const email = typeof data.email === "string" ? data.email.trim().toLowerCase() : "";
-  if (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) failure(400, "INVALID_EMAIL", "Enter a valid email address.");
-  const password = typeof data.password === "string" ? data.password : "";
-  if (password.length < (registration ? 12 : 1) || password.length > 128 || Buffer.byteLength(password, "utf8") > 512) {
-    failure(400, "INVALID_PASSWORD", registration ? "Use a password with 12 to 128 characters." : "Enter your password.");
-  }
+  const email = normalizeAccountEmail(data.email);
+  const password = validateAccountPassword(data.password, registration);
   const name = typeof data.name === "string" ? data.name.trim().replace(/\s+/g, " ") : "";
   if (registration && (!name || name.length > 80 || /[\u0000-\u001f\u007f]/.test(name))) failure(400, "INVALID_NAME", "Enter a name with 1 to 80 characters.");
   return { email, password, name };
@@ -107,10 +122,10 @@ export class AuthService {
       failure(415, "JSON_REQUIRED", "Send account details as JSON.");
     }
   }
-  limit(request: RequestLike) {
+  limit(request: RequestLike, scope = "sign-in") {
     const now = Date.now();
     for (const [key, window] of this.rateWindows) if (window.resetAt <= now) this.rateWindows.delete(key);
-    const key = request.socket.remoteAddress ?? "unknown";
+    const key = `${scope}:${request.socket.remoteAddress ?? "unknown"}`;
     const window = this.rateWindows.get(key) ?? { count: 0, resetAt: now + 15 * 60 * 1000 };
     if (window.count >= 20) failure(429, "TOO_MANY_ATTEMPTS", "Too many account attempts. Try again in 15 minutes.");
     window.count += 1;
@@ -140,7 +155,7 @@ export class AuthService {
       if ((error as { code?: string }).code === "23505") failure(409, "ACCOUNT_EXISTS", "An account already uses this email. Sign in instead.");
       throw error;
     } finally { client.release(); }
-    response.setHeader("Set-Cookie", sessionCookie(token));
+    response.setHeader("Set-Cookie", sessionCookies(token));
     response.setHeader("Cache-Control", "no-store");
     return { user };
   }
@@ -155,13 +170,20 @@ export class AuthService {
     const client = await pool.connect();
     try {
       await client.query("BEGIN");
+      // A reset can replace the verified hash while password derivation is running.
+      const current = await client.query<{ password_hash: string }>(
+        "SELECT password_hash FROM customer_accounts WHERE id=$1 FOR NO KEY UPDATE",
+        [account.id],
+      );
+      if (current.rows[0]?.password_hash !== account.password_hash)
+        failure(401, "INVALID_CREDENTIALS", "The email or password is incorrect.");
       await client.query("INSERT INTO customer_sessions(token_hash,account_id,expires_at) VALUES($1,$2,now() + interval '7 days')", [sessionHash(token), account.id]);
       const previous = cookieToken(request);
       if (previous) await client.query("UPDATE customer_sessions SET revoked_at=now() WHERE token_hash=$1 AND revoked_at IS NULL", [sessionHash(previous)]);
       await client.query("COMMIT");
     } catch (error) { await client.query("ROLLBACK"); throw error; }
     finally { client.release(); }
-    response.setHeader("Set-Cookie", sessionCookie(token));
+    response.setHeader("Set-Cookie", sessionCookies(token));
     response.setHeader("Cache-Control", "no-store");
     return { user: publicUser(account) };
   }
@@ -174,7 +196,7 @@ export class AuthService {
       "SELECT a.id,a.display_name,a.email_normalized FROM customer_sessions s JOIN customer_accounts a ON a.id=s.account_id WHERE s.token_hash=$1 AND s.revoked_at IS NULL AND s.expires_at > now()",
       [sessionHash(token)],
     );
-    if (!result.rows[0]) response.setHeader("Set-Cookie", sessionCookie("", 0));
+    if (!result.rows[0]) response.setHeader("Set-Cookie", sessionCookies("", 0));
     return { user: result.rows[0] ? publicUser(result.rows[0]) : null };
   }
   async orders(request: RequestLike, response: ResponseLike, after?: unknown) {
@@ -184,7 +206,7 @@ export class AuthService {
   }
   async managerAccess(request: RequestLike, response: ResponseLike) {
     const { user } = await this.me(request, response);
-    if (!user) failure(401, "SIGN_IN_REQUIRED", "Sign in to open the customer directory.");
+    if (!user) failure(401, "SIGN_IN_REQUIRED", "Sign in to open the staff workspace.");
     const pool = this.database();
     const role = await pool.query("SELECT 1 FROM restaurant_managers WHERE account_id=$1", [user.id]);
     if (!role.rowCount) failure(403, "MANAGER_REQUIRED", "This account does not have manager access.");
@@ -198,7 +220,7 @@ export class AuthService {
     const pool = this.database();
     const token = cookieToken(request);
     if (token) await pool.query("UPDATE customer_sessions SET revoked_at=now() WHERE token_hash=$1 AND revoked_at IS NULL", [sessionHash(token)]);
-    response.setHeader("Set-Cookie", sessionCookie("", 0));
+    response.setHeader("Set-Cookie", sessionCookies("", 0));
     response.setHeader("Cache-Control", "no-store");
     return { ok: true };
   }
@@ -219,6 +241,11 @@ export class AuthController {
   logout(@Req() request: RequestLike, @Res({ passthrough: true }) response: ResponseLike) { return this.auth.logout(request, response); }
   @Get("me")
   me(@Req() request: RequestLike, @Res({ passthrough: true }) response: ResponseLike) { return this.auth.me(request, response); }
+  @Get("admin/session")
+  async managerSession(@Req() request: RequestLike, @Res({ passthrough: true }) response: ResponseLike) {
+    const { accountId } = await this.auth.managerAccess(request, response);
+    return { authorized: true, accountId };
+  }
   @Get("orders")
   orders(@Req() request: RequestLike, @Res({ passthrough: true }) response: ResponseLike, @Query("after") after?: unknown) {
     return this.auth.orders(request, response, after);

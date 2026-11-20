@@ -394,3 +394,13 @@
     font-size: 30px;
   }
 }
+.guest-reviews-load-photos {
+  min-height: 44px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--red-dark);
+  font-size: .85rem;
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}

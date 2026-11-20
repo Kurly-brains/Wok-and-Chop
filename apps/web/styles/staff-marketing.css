@@ -1,0 +1,299 @@
+.staff-marketing {
+  width: min(100%, 1420px);
+  min-width: 0;
+  margin-inline: auto;
+  padding: clamp(22px, 4vw, 54px) clamp(16px, 4vw, 58px) 56px;
+  color: var(--ops-ink);
+  overflow-wrap: anywhere;
+}
+
+.staff-marketing-head {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  align-items: end;
+  gap: 10px 20px;
+  padding-bottom: 21px;
+  border-bottom: 3px double var(--red-line, #e3adaa);
+}
+
+.staff-marketing h1,
+.staff-marketing h2 {
+  margin: 0;
+  font-family: var(--serif), Georgia, serif;
+  font-weight: 400;
+}
+
+.staff-marketing h1 {
+  color: var(--ops-red);
+  font-size: clamp(43px, 5vw, 67px);
+  line-height: 1;
+  letter-spacing: -0.035em;
+}
+
+.staff-marketing h2 {
+  font-size: clamp(25px, 3vw, 33px);
+  line-height: 1.14;
+}
+
+.staff-marketing-head p {
+  margin-top: 8px;
+  color: var(--ops-muted);
+}
+
+.staff-marketing-head a,
+.staff-marketing-alert a {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  color: var(--ops-red);
+  font-size: 14px;
+  font-weight: 650;
+  text-underline-offset: 4px;
+}
+
+.staff-marketing-audience {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+  gap: 15px 20px;
+  align-items: center;
+  padding: 16px 0;
+  border-bottom: 1px solid var(--ops-line);
+}
+
+.staff-marketing-audience > div {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.staff-marketing-audience > div > span,
+.staff-marketing-limit {
+  color: var(--ops-muted);
+  font-size: 13px;
+}
+
+.staff-marketing-audience strong {
+  font-size: 14px;
+}
+
+.staff-marketing-audience .marketing-enabled {
+  color: #365948;
+}
+
+.staff-marketing-alert,
+.staff-marketing-notice:not(:empty) {
+  margin-top: 14px;
+  padding: 9px 12px;
+  border-inline-start: 2px solid var(--ops-red);
+  background: #faf0ef;
+  font-size: 14px;
+}
+
+.staff-marketing-alert .ops-text-button {
+  margin-inline-start: 6px;
+}
+
+.staff-marketing-notice:not(:empty) {
+  border-inline-start-color: #365948;
+  background: #edf2ee;
+}
+
+.staff-marketing-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+  gap: clamp(20px, 4vw, 48px);
+  align-items: start;
+  margin-top: 26px;
+}
+
+.staff-marketing-compose,
+.staff-marketing-preview {
+  display: grid;
+  gap: 15px;
+  min-width: 0;
+}
+
+.staff-marketing-compose label {
+  display: grid;
+  gap: 6px;
+  color: var(--ops-ink);
+  font-size: 14px;
+  font-weight: 650;
+}
+
+.staff-marketing-compose :is(input, textarea) {
+  width: 100%;
+  min-height: 46px;
+  border: 1px solid #c6beb7;
+  border-radius: 0;
+  padding: 10px 12px;
+  background: #fff;
+  color: #282421;
+  font:
+    400 16px/1.45 var(--body),
+    Arial,
+    sans-serif;
+}
+
+.staff-marketing-compose textarea {
+  resize: vertical;
+}
+.staff-marketing-limit {
+  margin-top: -8px;
+}
+.staff-marketing-compose .ops-button {
+  justify-self: start;
+}
+.staff-marketing :is(button, input, textarea):disabled {
+  cursor: default;
+  opacity: 0.58;
+}
+
+.staff-marketing-envelope {
+  display: grid;
+  gap: 12px;
+  padding: 16px clamp(13px, 2.4vw, 22px);
+  border: 1px solid var(--ops-line);
+  border-top: 3px solid var(--ops-red);
+  background: var(--ops-paper);
+}
+
+.staff-marketing-envelope p,
+.staff-marketing-envelope footer {
+  color: var(--ops-muted);
+  font-size: 13px;
+}
+
+.staff-marketing-envelope p {
+  font-weight: 700;
+}
+.staff-marketing-envelope p span {
+  font-weight: 400;
+}
+.staff-marketing-envelope strong {
+  font-size: 18px;
+}
+.staff-marketing-envelope div,
+.staff-marketing-confirm-body {
+  white-space: pre-wrap;
+}
+.staff-marketing-envelope footer {
+  padding-top: 13px;
+  border-top: 1px solid var(--ops-line);
+}
+
+.staff-marketing-history {
+  margin-top: 32px;
+  padding-top: 20px;
+  border-top: 1px solid var(--ops-line);
+}
+
+.staff-marketing-history > p {
+  margin-top: 8px;
+  color: var(--ops-muted);
+}
+
+.staff-marketing-history ul {
+  margin: 10px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.staff-marketing-history li {
+  border-bottom: 1px solid var(--ops-line);
+}
+
+.staff-marketing-history summary {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) max-content max-content;
+  align-items: center;
+  gap: 5px 18px;
+  min-height: 54px;
+  cursor: pointer;
+  padding-block: 8px;
+}
+
+.staff-marketing-history summary strong {
+  font-size: 15px;
+}
+.staff-marketing-history summary strong::before {
+  content: "▸";
+  margin-inline-end: 7px;
+  color: var(--ops-red);
+}
+.staff-marketing-history details[open] strong::before {
+  content: "▾";
+}
+.staff-marketing-history summary :is(span, time) {
+  color: var(--ops-muted);
+  font-size: 13px;
+}
+
+.staff-marketing-history details > p {
+  padding: 0 15px 14px;
+  white-space: pre-wrap;
+  font-size: 14px;
+}
+
+.staff-marketing-confirm {
+  position: fixed;
+  inset: 0;
+  width: min(580px, calc(100% - 24px));
+  max-width: none;
+  max-height: calc(100dvh - 24px);
+  margin: auto;
+  overflow: auto;
+  overscroll-behavior: contain;
+  padding: clamp(16px, 4vw, 29px);
+  border: 1px solid var(--ops-line);
+  border-top: 4px solid var(--ops-red);
+  background: #fff;
+  color: var(--ops-ink);
+}
+
+.staff-marketing-confirm::backdrop {
+  background: #2219149c;
+}
+.staff-marketing-confirm form {
+  display: grid;
+  gap: 12px;
+}
+.staff-marketing-confirm h2 {
+  color: var(--ops-red);
+}
+.staff-marketing-confirm p {
+  font-size: 14px;
+}
+.staff-marketing-confirm-subject {
+  border-top: 1px solid var(--ops-line);
+  padding-top: 12px;
+}
+.staff-marketing-confirm-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 14px;
+  align-items: center;
+}
+
+@media (max-width: 850px) {
+  .staff-marketing-audience {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .staff-marketing-audience .ops-text-button {
+    justify-self: start;
+  }
+  .staff-marketing-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+@media (max-width: 520px) {
+  .staff-marketing-history summary {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .staff-marketing-history summary strong::before {
+    margin-inline-end: 5px;
+  }
+}

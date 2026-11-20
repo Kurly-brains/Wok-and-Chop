@@ -1,0 +1,17 @@
+.wc-slide-panel {
+  display: grid;
+  grid-template-rows: minmax(0, 0fr);
+  opacity: 0;
+  transition: grid-template-rows .32s ease, opacity .24s ease;
+}
+
+.wc-slide-panel[data-open="true"] {
+  grid-template-rows: minmax(0, 1fr);
+  opacity: 1;
+}
+
+.wc-slide-panel-content { overflow: hidden; }
+
+@media (prefers-reduced-motion: reduce) {
+  .wc-slide-panel { transition: none; }
+}

@@ -143,6 +143,16 @@
   font-weight: 700;
   letter-spacing: -7px;
 }
+
+.food-stage-no-photo {
+  display: grid;
+  place-items: center;
+  width: 80%;
+  aspect-ratio: 1;
+  color: #fff4e6;
+  font: 400 clamp(26px, 5vw, 64px)/1 "Wok Inscriptions", serif;
+}
+
 .layer-hero-invitation {
   position: absolute;
   z-index: 5;
@@ -196,7 +206,7 @@
   background: var(--paper);
   isolation: isolate;
 }
-.food-showcase:before {
+.layer-hero + .wc-order::before {
   content: "";
   position: absolute;
   left: 0;

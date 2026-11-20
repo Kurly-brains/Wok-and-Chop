@@ -1,8 +1,6 @@
-import type { Metadata } from "next";
-import { KitchenDisplay } from "../../../components/operations/KitchenDisplay";
-import "../../../styles/operations.css";
+import { redirect } from "next/navigation";
 
-export const metadata: Metadata = { title: "Training kitchen display · Wok & Chop", robots: { index: false, follow: false } };
-
-export default function KitchenPage() { return <KitchenDisplay />; }
+export default function TrainingKitchen() {
+  redirect("/kitchen/");
+}
 

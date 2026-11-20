@@ -40,7 +40,6 @@
   color: white;
   font-size: clamp(16px, 1.6vw, 22px);
 }
-.wc-home-kitchen-art { position: relative; }
 .ink-signature {
   position: absolute;
   z-index: 1;

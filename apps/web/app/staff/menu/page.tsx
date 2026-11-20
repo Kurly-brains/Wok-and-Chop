@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import MenuEditor from "../../../components/menu-editor";
+import { requireStaff } from "../../../lib/require-staff";
 import "../../../styles/operations.css";
 import "../../../styles/customer-directory.css";
 import "../../../styles/menu-editor.css";
@@ -11,6 +12,7 @@ export const metadata: Metadata = {
   robots: { index: false, follow: false },
 };
 
-export default function MenuEditorPage() {
+export default async function MenuEditorPage() {
+  await requireStaff("menu");
   return <MenuEditor />;
 }

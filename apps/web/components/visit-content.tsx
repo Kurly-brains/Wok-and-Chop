@@ -1,4 +1,5 @@
 import Link from "next/link";
+import GuestContactForms from "./guest-contact-forms";
 import InkInscription from "./ink-inscription";
 import "../styles/contact.css";
 
@@ -12,6 +13,9 @@ export function VisitContent() {
       <header className="wc-contact-heading">
         <h1 id="contact-title">Contact us.</h1>
         <p>Find our Hakka kitchen in Kanata Entertainment Centrum.</p>
+        <nav className="guest-contact-jumps" aria-label="Visit and contact options">
+          <a href="#contact-message">Send a message <span aria-hidden="true">↘</span></a>
+        </nav>
       </header>
 
       <div className="wc-contact-layout">
@@ -72,15 +76,16 @@ export function VisitContent() {
           </p>
         </section>
         <section aria-labelledby="contact-ordering-title">
-          <h2 id="contact-ordering-title">Home delivery</h2>
+          <h2 id="contact-ordering-title">Pickup or delivery</h2>
           <p>
-            Explore the guest checkout and delivery tracker with a test order.
+            Pick up at our Kanata kitchen or order delivery through Uber Eats.
           </p>
-          <Link href="/delivery/">
-            Home delivery <span aria-hidden="true">↗</span>
+          <Link href="/order/">
+            Order online <span aria-hidden="true">↗</span>
           </Link>
         </section>
       </div>
+      <GuestContactForms />
     </section>
   );
 }

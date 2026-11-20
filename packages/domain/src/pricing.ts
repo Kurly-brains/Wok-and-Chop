@@ -41,10 +41,14 @@ export function normalizeNote(note = ''): string {
   return note.replace(/<[^>]*>/g, '').replace(/[\u0000-\u001f\u007f-\u009f]/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
+export function isDishAvailable(item: MenuItem): boolean {
+  return item.available !== false && item.archived !== true;
+}
+
 /** Uses only trusted catalog amounts; a customer's total is never accepted. */
 export function priceLine(selection: CartSelection, catalog: readonly MenuItem[]): PricedLine {
   const item = catalog.find((entry) => entry.id === selection.itemId);
-  if (!item || item.available === false) throw new DomainError('ITEM_UNAVAILABLE', 'This dish is no longer available.');
+  if (!item || !isDishAvailable(item)) throw new DomainError('ITEM_UNAVAILABLE', 'This dish is no longer available.');
   if (!Number.isInteger(selection.quantity) || selection.quantity < 1 || selection.quantity > 20) throw new DomainError('INVALID_QUANTITY', 'Choose a quantity from 1 to 20.');
   cents(item.priceCents, 'Base price');
   const selected = selection.modifierIds ?? [];

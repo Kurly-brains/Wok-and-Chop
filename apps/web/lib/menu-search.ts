@@ -1,4 +1,4 @@
-import { isLunchMenuItem, lunchCategories, lunchMenuItems, type MenuItem } from "@wok/domain";
+import { isDishAvailable, isLunchMenuItem, lunchCategories, lunchMenuItems, type MenuItem } from "@wok/domain";
 
 const commonLunchDescription = lunchMenuItems[0].description;
 const aliases = new Map(Object.entries({
@@ -46,7 +46,7 @@ function relevance(item: MenuItem, query: string[]): number {
 export function searchLunchMenu(items: readonly MenuItem[], category: string, text: string) {
   const query = words(text);
   const ranked = items
-    .filter((item) => isLunchMenuItem(item) && item.available !== false && (category === "all" || item.categoryId === category))
+    .filter((item) => isLunchMenuItem(item) && isDishAvailable(item) && (category === "all" || item.categoryId === category))
     .map((item) => ({ item, score: relevance(item, query) }))
     .filter(({ score }) => score > 0);
   // A search for fried rice should lead to the entrée before offering it as a side.

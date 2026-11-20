@@ -49,6 +49,13 @@ try {
     if ($LASTEXITCODE -ne 0) { throw 'Delivery request migration failed.' }
     & (Join-Path $pgBin 'psql.exe') -h 127.0.0.1 -p 55440 -U wok_auth -d $dbName -v ON_ERROR_STOP=1 -f (Join-Path $projectPath 'packages\database\migrations\007_shared_preview_menu.up.sql')
     if ($LASTEXITCODE -ne 0) { throw 'Shared preview menu migration failed.' }
+    & (Join-Path $pgBin 'psql.exe') -h 127.0.0.1 -p 55440 -U wok_auth -d $dbName -v ON_ERROR_STOP=1 -f (Join-Path $projectPath 'packages\database\migrations\008_pickup_fulfillment.up.sql')
+    if ($LASTEXITCODE -ne 0) { throw 'Pickup fulfillment migration failed.' }
+    foreach ($featureMigration in @('009_notification_emails', '010_guest_services', '011_password_reset_codes', '012_custom_menu_items', '013_windows_print_jobs', '015_pickup_management', '016_email_marketing')) {
+      $migrationPath = Join-Path $projectPath "packages\database\migrations\$featureMigration.up.sql"
+      & (Join-Path $pgBin 'psql.exe') -h 127.0.0.1 -p 55440 -U wok_auth -d $dbName -v ON_ERROR_STOP=1 -f $migrationPath
+      if ($LASTEXITCODE -ne 0) { throw "Migration $featureMigration failed." }
+    }
   }
 } finally { $env:PGPASSWORD = $previousPgPassword }
 $env:AUTH_DATABASE_URL = "postgresql://wok_auth:$dbPassword@127.0.0.1:55440/wok_chop_auth_dev"

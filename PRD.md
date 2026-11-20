@@ -56,6 +56,8 @@ The owner can change these decisions before implementation. A change to payment 
 
 Online orders may be managed by staff, but a complete staff-entered counter-order/POS module is not assumed. If required at launch, payment methods, cash handling, and printing rules need a separately approved extension. Receipt viewing or manual browser printing does not satisfy the automatic kitchen-printing requirement.
 
+The owner approved an email offers feature. Visitors can subscribe without a customer account and confirm by email. Managers can preview and send offers to confirmed subscribers. Guests can unsubscribe from any offer. The same Hostinger mailbox handles operational and marketing email, with separate consent and a marketing send allowance.
+
 ## 5. Users and access
 
 | Role | Main capabilities | Restrictions |

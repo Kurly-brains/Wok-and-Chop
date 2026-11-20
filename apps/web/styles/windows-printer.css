@@ -1,0 +1,141 @@
+.windows-printer-panel {
+  min-width: 0;
+  padding: clamp(18px, 2.8vw, 30px);
+  border: 1px solid var(--ops-line);
+  border-top: 3px solid var(--ops-red);
+  background: #fff;
+}
+
+.windows-printer-panel-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 7px 18px;
+  margin-bottom: 12px;
+}
+
+.windows-printer-panel-head h2 {
+  color: var(--ops-red);
+  font: 400 clamp(23px, 2.8vw, 31px) / 1.12 var(--serif);
+}
+
+.windows-printer-panel .ops-button,
+.pickup-print-action .ops-button {
+  width: fit-content;
+}
+
+.windows-printer-panel > a.ops-button {
+  margin-top: 14px;
+  color: white;
+}
+
+.windows-printer-facts {
+  margin: 0 0 12px;
+  padding-block: 8px;
+  border-block: 1px solid var(--ops-line);
+}
+
+.windows-printer-facts > div {
+  display: grid;
+  grid-template-columns: minmax(80px, 0.7fr) minmax(0, 1.3fr);
+  gap: 7px;
+  padding-block: 4px;
+}
+
+.windows-printer-facts dt {
+  color: var(--ops-muted);
+  font-size: 13px;
+}
+
+.windows-printer-facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+  font-weight: 700;
+}
+
+.windows-printer-test {
+  display: grid;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.windows-printer-test > h3,
+.windows-printer-jobs h3 {
+  font-size: 16px;
+}
+
+.windows-printer-recovery summary {
+  min-height: 36px;
+  color: var(--ops-red);
+  cursor: pointer;
+}
+
+.windows-printer-recovery p {
+  color: var(--ops-muted);
+  font-size: 13px;
+}
+
+.windows-printer-jobs {
+  padding-top: 14px;
+  margin-top: 18px;
+  border-top: 1px solid var(--ops-line);
+}
+
+.windows-printer-jobs ul {
+  display: grid;
+  gap: 8px;
+  margin: 9px 0 0;
+  padding: 0;
+  list-style: none;
+}
+
+.windows-printer-jobs li {
+  display: flex;
+  justify-content: space-between;
+  align-items: start;
+  gap: 8px 12px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--ops-line);
+  font-size: 12px;
+}
+
+.windows-printer-jobs time {
+  display: block;
+  color: var(--ops-muted);
+}
+
+.windows-print-result {
+  display: grid;
+  gap: 3px;
+  padding: 8px 10px;
+  border-inline-start: 3px solid #406145;
+  background: #f1f3eb;
+  color: #253b29;
+  font-size: 13px;
+}
+
+.windows-print-result[data-status="FAILED"],
+.windows-print-result[data-status="UNKNOWN"] {
+  border-color: var(--ops-red);
+  background: #fff0e9;
+  color: #6e2314;
+}
+
+.pickup-print-action {
+  display: grid;
+  gap: 8px;
+  margin: 10px 0;
+  color: var(--ops-muted);
+  font-size: 13px;
+}
+
+.pickup-print-action a {
+  color: var(--ops-red);
+  text-underline-offset: 3px;
+}
+
+.pickup-print-action [role="alert"],
+.windows-printer-test [role="alert"] {
+  color: var(--ops-red);
+}

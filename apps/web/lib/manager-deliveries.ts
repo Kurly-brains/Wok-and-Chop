@@ -4,18 +4,33 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { API_URL, refreshCustomer } from "./customer-session";
 import type { DeliveryStatus, DeliveryStatusEvent } from "./delivery";
 
-export type { DeliveryStatus } from "./delivery";
+export type ManagerOrderStatus = DeliveryStatus | "READY_FOR_PICKUP" | "PICKED_UP";
+export type ManagerAuditEvent = {
+  action: "STATUS" | "UNDO" | "NOTE" | "ARCHIVE" | "RESTORE";
+  at: string;
+  status: ManagerOrderStatus;
+  version: number;
+  reason?: string | null;
+};
 export type ManagerDelivery = {
   id: string;
   number: string;
-  status: DeliveryStatus;
+  status: ManagerOrderStatus;
+  fulfillment?: "DELIVERY" | "PICKUP";
   version: number;
   createdAt: string;
   updatedAt: string;
-  statusHistory?: DeliveryStatusEvent[];
+  managerNote?: string;
+  archived?: boolean;
+  archivedAt?: string | null;
+  createdByManager?: boolean;
+  canUndoStatus?: boolean;
+  undoTargetStatus?: ManagerOrderStatus | null;
+  auditHistory?: ManagerAuditEvent[];
+  statusHistory?: (Omit<DeliveryStatusEvent, "status"> & { status: ManagerOrderStatus })[];
   name: string;
   phone: string;
-  address: { street: string; unit: string; city: string; province: string; postalCode: string };
+  address: { street: string; unit: string; city: string; province: string; postalCode: string } | null;
   instructions: string;
   items: { name: string; quantity: number; modifiers: string[]; note: string; lineTotalCents: number }[];
   subtotalCents: number;
@@ -24,22 +39,37 @@ export type ManagerDelivery = {
   taxCents: number | null;
   totalCents: number;
 };
-type Scope = "active" | "history";
+export type ManagerQueueScope = "active" | "history" | "archived";
 type Result = { deliveries: ManagerDelivery[]; nextCursor: string | null };
 type Access = "loading" | "ready" | "signed-out" | "forbidden" | "error";
 const endpoint = API_URL + "/v1/auth/admin/deliveries";
-export const statusNames: Record<DeliveryStatus, string> = {
-  RECEIVED: "Received", PREPARING: "Preparing", OUT_FOR_DELIVERY: "Out for delivery", DELIVERED: "Delivered", CANCELLED: "Cancelled",
+export const statusNames: Record<ManagerOrderStatus, string> = {
+  RECEIVED: "Received", PREPARING: "Preparing", READY_FOR_PICKUP: "Ready for pickup", PICKED_UP: "Picked up",
+  OUT_FOR_DELIVERY: "Out for delivery", DELIVERED: "Delivered", CANCELLED: "Cancelled",
 };
-export const nextAction: Partial<Record<DeliveryStatus, { status: DeliveryStatus; title: string }>> = {
+type OrderAction = { status: ManagerOrderStatus; title: string };
+const deliveryActions: Partial<Record<ManagerOrderStatus, OrderAction>> = {
   RECEIVED: { status: "PREPARING", title: "Start preparation" },
   PREPARING: { status: "OUT_FOR_DELIVERY", title: "Mark out for delivery" },
   OUT_FOR_DELIVERY: { status: "DELIVERED", title: "Mark delivered" },
 };
+const pickupActions: Partial<Record<ManagerOrderStatus, OrderAction>> = {
+  RECEIVED: deliveryActions.RECEIVED,
+  PREPARING: { status: "READY_FOR_PICKUP", title: "Mark ready for pickup" },
+  READY_FOR_PICKUP: { status: "PICKED_UP", title: "Mark picked up" },
+};
+export function nextOrderAction(order: ManagerDelivery) {
+  return (order.fulfillment === "PICKUP" ? pickupActions : deliveryActions)[order.status];
+}
 export const restaurantClock = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto", hour: "numeric", minute: "2-digit" });
 export const restaurantDate = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Toronto", month: "short", day: "numeric" });
 
-export function useManagerDeliveries(scope: Scope, cursor = "") {
+type PickupManagementAction =
+  | { type: "undo"; reason: string }
+  | { type: "archive"; archived: boolean }
+  | { type: "note"; note: string };
+
+export function useManagerDeliveries(scope: ManagerQueueScope, cursor = "") {
   const [orders, setOrders] = useState<ManagerDelivery[]>([]);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [access, setAccess] = useState<Access>("loading");
@@ -67,7 +97,7 @@ export function useManagerDeliveries(scope: Scope, cursor = "") {
       let next: string | null;
       const seen = new Set<string>();
       do {
-        if (seen.has(after)) throw new Error("Could not finish loading delivery tickets.");
+        if (seen.has(after)) throw new Error("Could not finish loading order tickets.");
         seen.add(after);
         const params = new URLSearchParams({ scope });
         if (after) params.set("after", after);
@@ -82,7 +112,7 @@ export function useManagerDeliveries(scope: Scope, cursor = "") {
       } while (scope === "active" && next);
       if (controller.signal.aborted) return;
       setOrders([...found.values()]);
-      setNextCursor(scope === "history" ? next : null);
+      setNextCursor(scope === "active" ? null : next);
       setChecked(new Date());
       setAccess("ready");
     } catch {
@@ -102,24 +132,32 @@ export function useManagerDeliveries(scope: Scope, cursor = "") {
     return () => { window.clearTimeout(initial); window.clearInterval(timer); window.removeEventListener("focus", poll); inflight.current?.abort(); command.current?.abort(); };
   }, [refresh, scope]);
 
-  async function transition(order: ManagerDelivery, status: DeliveryStatus) {
-    if (command.current) return;
+  async function updateOrder(
+    order: ManagerDelivery,
+    action: string,
+    changes: Record<string, string | boolean>,
+    success: string,
+  ) {
+    if (command.current) return false;
     const controller = new AbortController();
     command.current = controller;
     setSaving(true);
     setMessage("");
     try {
-      const response = await fetch(endpoint + "/" + encodeURIComponent(order.id) + "/status", {
+      const response = await fetch(endpoint + "/" + encodeURIComponent(order.id) + "/" + action, {
         method: "POST", credentials: "include", cache: "no-store", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ expectedVersion: order.version, status }), signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]),
+        body: JSON.stringify({ expectedVersion: order.version, ...changes }), signal: AbortSignal.any([controller.signal, AbortSignal.timeout(15000)]),
       });
-      if (controller.signal.aborted) return;
-      if (response.status === 401 || response.status === 403) { inflight.current?.abort(); restrict(response.status); return; }
-      if (response.status === 409) { setMessage("Another team member updated this ticket. Review its latest status."); }
+      if (controller.signal.aborted) return false;
+      if (response.status === 401 || response.status === 403) { inflight.current?.abort(); restrict(response.status); return false; }
+      if (response.status === 409) { setMessage("This ticket changed or the action is no longer available. Review its latest details."); }
       else if (!response.ok) {
         const result = await response.json().catch(() => ({}));
-        setMessage(typeof result.message === "string" ? result.message : "Could not update this delivery.");
-      } else { setMessage(order.number + " marked " + statusNames[status].toLowerCase() + "."); }
+        setMessage(typeof result.message === "string" ? result.message : "Could not update this order.");
+      } else {
+        setMessage(success);
+        return true;
+      }
     } catch {
       if (!controller.signal.aborted) setMessage("The update could not be confirmed. Check the ticket’s current status before retrying.");
     } finally {
@@ -127,8 +165,24 @@ export function useManagerDeliveries(scope: Scope, cursor = "") {
       command.current = null;
       if (!controller.signal.aborted) setSaving(false);
     }
+    return false;
   }
 
-  return { access, orders, checked, nextCursor, refresh, transition, message, saving };
+  function transition(order: ManagerDelivery, status: ManagerOrderStatus) {
+    return updateOrder(order, "status", { status }, `${order.number} marked ${statusNames[status].toLowerCase()}.`);
+  }
+
+  function managePickup(order: ManagerDelivery, action: PickupManagementAction) {
+    switch (action.type) {
+      case "undo":
+        return updateOrder(order, "undo", { reason: action.reason }, `${order.number}'s status was restored.`);
+      case "archive":
+        return updateOrder(order, "archive", { archived: action.archived }, `${order.number} ${action.archived ? "moved to the archive" : "restored to order history"}.`);
+      case "note":
+        return updateOrder(order, "note", { note: action.note }, `${order.number}'s manager note was ${action.note ? "saved" : "removed"}.`);
+    }
+  }
+
+  return { access, orders, checked, nextCursor, refresh, transition, managePickup, message, saving };
 }
 export type ManagerQueue = ReturnType<typeof useManagerDeliveries>;

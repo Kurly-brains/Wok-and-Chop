@@ -153,6 +153,7 @@ Permissions shall be enforced by the API, not merely by hidden interface buttons
 | FR-057 | Refund amounts shall preserve original tax/discount allocation, support explicit tip/fee treatment, and record item-level or amount-level reasons. Orders shall retain their original financial snapshot and an additive adjustment ledger. |
 | FR-058 | Authorized administrators shall manage staff access, business hours, capacity, tax profiles, integration credentials through protected mechanisms, printer mappings, fallback settings, and notification templates. Changes shall be versioned or auditable and shall not rewrite historical orders. |
 | FR-059 | The application shall provide audited data export, correction, and retention/deletion workflows consistent with the approved privacy and financial retention policy. Operational contact data and retained financial records shall be separable; failed deletion jobs shall be observable. |
+| FR-060 | Marketing offers require a separate affirmative guest signup and email confirmation. Managers shall preview an offer before queueing it for confirmed subscribers. Queueing shall be idempotent, recheck consent before sending, and include sender identification and an unsubscribe link in each offer. |
 
 ## 5. State and data integrity
 

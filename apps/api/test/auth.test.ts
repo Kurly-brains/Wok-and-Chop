@@ -37,13 +37,48 @@ async function post(path: string, body: unknown, cookie?: string, suppliedOrigin
   });
 }
 function responseCookie(response: Response) {
-  const cookie = response.headers.get("set-cookie");
+  const cookies = response.headers.getSetCookie();
+  assert.equal(cookies.length, 2);
+  const cookie = cookies[0];
   assert.ok(cookie);
   assert.match(cookie, /HttpOnly/);
   assert.match(cookie, /SameSite=Lax/);
-  assert.match(cookie, /Path=\/v1\/auth/);
+  assert.match(cookie, /Path=\/;/);
+  assert.match(cookies[1], /^wok_customer_session=; HttpOnly; SameSite=Lax; Path=\/v1\/auth; Max-Age=0; Expires=/);
   return cookie.split(";")[0];
 }
+
+test("the staff session gate rechecks manager membership and session validity", { skip: !enabled }, async () => {
+  const fixtureEmail = `manager-session-${randomUUID()}@example.invalid`;
+  try {
+    const endpoint = `${base}/v1/auth/admin/session`;
+    assert.equal((await fetch(endpoint)).status, 401);
+    assert.equal((await fetch(endpoint, { headers: { Cookie: `wok_customer_session=${"0".repeat(64)}` } })).status, 401);
+    const registration = await post("register", { name: "Manager session fixture", email: fixtureEmail, password });
+    assert.equal(registration.status, 201);
+    const cookie = responseCookie(registration);
+    const { user } = await registration.json();
+    const headers = { Cookie: cookie };
+    assert.equal((await fetch(endpoint, { headers })).status, 403);
+    await pool.query("INSERT INTO restaurant_managers(account_id) VALUES($1)", [user.id]);
+    const authorized = await fetch(endpoint, { headers });
+    assert.equal(authorized.status, 200);
+    assert.equal(authorized.headers.get("cache-control"), "no-store");
+    assert.deepEqual(await authorized.json(), { authorized: true, accountId: user.id });
+    await pool.query("DELETE FROM restaurant_managers WHERE account_id=$1", [user.id]);
+    assert.equal((await fetch(endpoint, { headers })).status, 403);
+    await pool.query("INSERT INTO restaurant_managers(account_id) VALUES($1)", [user.id]);
+    assert.equal((await post("logout", {}, cookie)).status, 200);
+    assert.equal((await fetch(endpoint, { headers })).status, 401);
+    const signedIn = await post("login", { email: fixtureEmail, password });
+    assert.equal(signedIn.status, 200);
+    const expiredCookie = responseCookie(signedIn);
+    await pool.query("UPDATE customer_sessions SET created_at=now()-interval '8 days',expires_at=now()-interval '1 day' WHERE token_hash=$1", [createHash("sha256").update(expiredCookie.split("=")[1]).digest("hex")]);
+    assert.equal((await fetch(endpoint, { headers: { Cookie: expiredCookie } })).status, 401);
+  } finally {
+    await pool.query("DELETE FROM customer_accounts WHERE email_normalized=$1", [fixtureEmail]);
+  }
+});
 
 test("the customer directory checks manager membership on every lookup", { skip: !enabled }, async () => {
   const fixtureEmail = `directory-${randomUUID()}@example.invalid`;
@@ -134,7 +169,10 @@ test("customer auth persists salted hashes, rotates sessions and revokes logout"
   assert.equal((await post("logout", {}, newCookie, "https://untrusted.example")).status, 403);
   const logout = await post("logout", {}, newCookie);
   assert.equal(logout.status, 200);
-  assert.match(logout.headers.get("set-cookie")!, /Max-Age=0/);
+  assert.equal(logout.headers.getSetCookie().length, 2);
+  assert.ok(logout.headers.getSetCookie().every(cookie => cookie.includes("Max-Age=0") && cookie.includes("HttpOnly") && cookie.includes("SameSite=Lax")));
+  assert.match(logout.headers.getSetCookie()[0], /Path=\/;/);
+  assert.match(logout.headers.getSetCookie()[1], /Path=\/v1\/auth;/);
   const loggedOut = await fetch(`${base}/v1/auth/me`, { headers: { Cookie: newCookie } });
   assert.equal((await loggedOut.json()).user, null);
   assert.equal((await fetch(`${base}/v1/auth/orders`, { headers: { Cookie: newCookie } })).status, 401);
@@ -146,6 +184,8 @@ test("customer auth persists salted hashes, rotates sessions and revokes logout"
   await pool.query("UPDATE customer_sessions SET created_at=now() - interval '8 days', expires_at=now() - interval '1 day' WHERE token_hash=$1", [createHash("sha256").update(expiringCookie.split("=")[1]).digest("hex")]);
   const expired = await fetch(`${base}/v1/auth/me`, { headers: { Cookie: expiringCookie } });
   assert.equal((await expired.json()).user, null);
+  assert.equal(expired.headers.getSetCookie().length, 2);
+  assert.ok(expired.headers.getSetCookie().every(cookie => cookie.includes("Max-Age=0")));
   assert.equal((await fetch(`${base}/v1/checkout-sessions`, { method: "POST" })).status, 503);
 });
 

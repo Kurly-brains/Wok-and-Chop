@@ -9,6 +9,7 @@ import {
 } from "../../apps/web/lib/cart-store";
 import {
   getMenuCatalogSnapshot,
+  refreshPublishedMenu,
   resetCatalog,
   saveMenuItem,
 } from "../../apps/web/lib/menu-catalog";
@@ -128,4 +129,52 @@ test("Restoration rejects tampered quantities and reprices preserved selections 
   assert.throws(() => setCart([{ ...noodles, quantity: 21 }]), /quantity/i);
   assert.deepEqual(getCartSnapshot(), [noodles]);
   assert.deepEqual(JSON.parse(storage.getItem(CART_KEY)!), [noodles]);
+});
+
+test("A saved pickup bag waits for removed lunch modifier groups in the published menu", async (context) => {
+  const plain = {
+    key: "plain-chicken", itemId: "lunch-chilli-chicken", quantity: 2,
+    modifierIds: [], note: "Pack separately",
+  };
+  const oneGroup = {
+    key: "chow-mein-with-pop", itemId: "lunch-chicken-chow-mein", quantity: 1,
+    modifierIds: ["lunch-pop"], note: "",
+  };
+  const stale = { ...plain, key: "stale", itemId: "lunch-chilli-beef" };
+  const valid = { ...rolls, key: "lollipops", itemId: "chicken-lollipops" };
+  saveMenuItem(rolls.itemId, { available: false });
+  storage.setItem(CART_KEY, JSON.stringify([
+    valid,
+    plain,
+    oneGroup,
+    stale,
+    rolls,
+    { ...noodles, modifierIds: [] },
+    { ...plain, key: "unknown-option", modifierIds: ["spice-mild"] },
+    { ...plain, key: "invalid-quantity", quantity: 0 },
+    { ...plain, key: "invalid-note", note: "x".repeat(241) },
+  ]));
+  let resolve!: (response: Response) => void;
+  const promise = new Promise<Response>((complete) => { resolve = complete; });
+  context.mock.method(globalThis, "fetch", () => promise);
+  const ready = refreshPublishedMenu();
+
+  assert.deepEqual(getCartSnapshot(), [valid]);
+  assert.deepEqual(JSON.parse(storage.getItem(CART_KEY)!), [valid, plain, oneGroup, stale]);
+  assert.throws(() => setCart(() => Array.from({ length: 40 }, (_, index) => ({
+    ...valid,
+    key: `existing-${index}`,
+  }))), /up to 40 selections/);
+  const updated = { ...valid, quantity: 3 };
+  setCart(() => [updated]);
+  assert.deepEqual(JSON.parse(storage.getItem(CART_KEY)!), [updated, plain, oneGroup, stale]);
+
+  resolve(Response.json({ version: 1, overrides: {
+    [plain.itemId]: { modifierGroupIds: [] },
+    [oneGroup.itemId]: { modifierGroupIds: ["lunch-soup-or-pop"] },
+  }}));
+  assert.equal(await ready, true);
+  assert.deepEqual(getCartSnapshot(), [updated, plain, oneGroup]);
+  assert.deepEqual(JSON.parse(storage.getItem(CART_KEY)!), [updated, plain, oneGroup]);
+  assert.equal(priceLine(plain, getMenuCatalogSnapshot()).lineTotalCents, 2798);
 });

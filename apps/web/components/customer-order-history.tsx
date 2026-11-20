@@ -1,8 +1,10 @@
-import { useEffect, useId, useState } from "react";
-import Link from "next/link";
+"use client";
+
+import { useEffect, useId, useState, type ReactNode } from "react";
 import { formatMoney } from "@wok/domain";
 import { API_URL, refreshCustomer } from "../lib/customer-session";
-import "../styles/customer-order-history.css";
+import OrderStatusCharacter from "./order-status-character";
+import "../styles/account-orders.css";
 
 type ReceiptItem = {
   name: string;
@@ -59,28 +61,148 @@ const payment: Record<string, string> = {
   FAILED: "Failed",
 };
 
-function OrderReceipt({ order }: { order: PickupOrder }) {
+type AccountOrderCardProps = {
+  reference: string;
+  createdAt: string;
+  statusCode: string;
+  statusLabel: string;
+  items: ReceiptItem[];
+  totalCents: number;
+  subtotalCents?: number;
+  discountCents?: number;
+  totalLabel?: "Order total" | "Food total";
+  updates?: { at: string; label: string }[];
+  metadata?: ReactNode;
+  children?: ReactNode;
+};
+
+export function AccountOrderCard({
+  reference,
+  createdAt,
+  statusCode,
+  statusLabel,
+  items,
+  totalCents,
+  subtotalCents,
+  discountCents = 0,
+  totalLabel = "Food total",
+  updates,
+  metadata,
+  children,
+}: AccountOrderCardProps) {
+  const quantity = items.reduce((count, item) => count + item.quantity, 0);
+  const hasDiscount = discountCents > 0 && subtotalCents !== undefined;
+
   return (
-    <details className="pickup-receipt">
+    <details className="account-order-card">
       <summary>
-        <span className="receipt-number">
-          Order #{order.number}
-          <time dateTime={order.createdAt}>
-            {orderDate.format(new Date(order.createdAt))}
-          </time>
+        <span className="account-order-reference">
+          <strong>Order {reference}</strong>
+          <small>
+            <time dateTime={createdAt}>
+              {orderDate.format(new Date(createdAt))}
+            </time>
+            {quantity > 0 && (
+              <>
+                {" "}
+                <span aria-hidden="true">·</span> {quantity}{" "}
+                {quantity === 1 ? "item" : "items"}
+              </>
+            )}
+          </small>
         </span>
-        <span className="receipt-state" data-state={order.fulfillmentStatus}>
-          {fulfilment[order.fulfillmentStatus] ?? "Status unavailable"}
+        <span className="account-order-status" data-state={statusCode}>
+          <OrderStatusCharacter status={statusCode} />
+          <span>{statusLabel}</span>
         </span>
-        <strong className="receipt-total">
-          {formatMoney(order.totalCents)}
-        </strong>
-        <span className="receipt-chevron" aria-hidden="true">
-          ⌄
+        <span className="account-order-summary-total">
+          <small>{totalLabel}</small>
+          <strong>{formatMoney(totalCents)}</strong>
+        </span>
+        <span className="account-order-toggle">
+          <span className="account-order-view">View details</span>
+          <span className="account-order-hide">Hide details</span>
+          <span className="account-order-chevron" aria-hidden="true" />
         </span>
       </summary>
-      <div className="receipt-body">
-        <dl className="receipt-metadata">
+      <div className="account-order-body">
+        {metadata}
+        <div className="account-order-details">
+          <div>
+            <h3>Items</h3>
+            {items.length > 0 ? (
+              <ul className="account-order-items" aria-label="Ordered dishes">
+                {items.map((item, index) => (
+                  <li key={index}>
+                    <span className="account-order-quantity">
+                      {item.quantity} ×
+                    </span>
+                    <span>
+                      <strong>{item.name}</strong>
+                      {item.modifiers.length > 0 && (
+                        <small>{item.modifiers.join(" · ")}</small>
+                      )}
+                    </span>
+                    {item.lineTotalCents !== null && (
+                      <span>{formatMoney(item.lineTotalCents)}</span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            ) : (
+              <p>Item details are unavailable for this order.</p>
+            )}
+            <dl className="account-order-totals">
+              {hasDiscount && (
+                <>
+                  <div>
+                    <dt>Subtotal</dt>
+                    <dd>{formatMoney(subtotalCents)}</dd>
+                  </div>
+                  <div>
+                    <dt>Discount</dt>
+                    <dd>−{formatMoney(discountCents)}</dd>
+                  </div>
+                </>
+              )}
+              <div>
+                <dt>{totalLabel}</dt>
+                <dd>{formatMoney(totalCents)}</dd>
+              </div>
+            </dl>
+          </div>
+          {Boolean(updates?.length) && (
+            <div className="account-order-updates">
+              <h3>Order updates</h3>
+              <ol>
+                {updates?.map(({ at, label }, index) => (
+                  <li key={index}>
+                    <strong>{label}</strong>
+                    <time dateTime={at}>{pickupTime.format(new Date(at))}</time>
+                  </li>
+                ))}
+              </ol>
+            </div>
+          )}
+        </div>
+        {children}
+      </div>
+    </details>
+  );
+}
+
+function OrderReceipt({ order }: { order: PickupOrder }) {
+  return (
+    <AccountOrderCard
+      reference={`#${order.number}`}
+      createdAt={order.createdAt}
+      statusCode={order.fulfillmentStatus}
+      statusLabel={fulfilment[order.fulfillmentStatus] ?? "Status unavailable"}
+      items={order.items}
+      totalCents={order.totalCents}
+      totalLabel="Order total"
+      metadata={
+        <dl className="account-order-metadata">
           <div>
             <dt>Payment</dt>
             <dd>{payment[order.paymentStatus] ?? "Status unavailable"}</dd>
@@ -98,32 +220,8 @@ function OrderReceipt({ order }: { order: PickupOrder }) {
             </dd>
           </div>
         </dl>
-        {order.items.length > 0 ? (
-          <ul className="receipt-items" aria-label="Ordered dishes">
-            {order.items.map((item, index) => (
-              <li key={index}>
-                <span className="receipt-quantity">{item.quantity} ×</span>
-                <span>
-                  {item.name}
-                  {item.modifiers.length > 0 && (
-                    <small>{item.modifiers.join(" · ")}</small>
-                  )}
-                </span>
-                {item.lineTotalCents !== null && (
-                  <span>{formatMoney(item.lineTotalCents)}</span>
-                )}
-              </li>
-            ))}
-          </ul>
-        ) : (
-          <p>Item details are unavailable for this order.</p>
-        )}
-        <div className="receipt-sum">
-          <span>Order total (CAD)</span>
-          <strong>{formatMoney(order.totalCents)}</strong>
-        </div>
-      </div>
-    </details>
+      }
+    />
   );
 }
 
@@ -138,7 +236,8 @@ export default function CustomerOrderHistory(props: HistoryProps) {
 }
 
 function OrderHistoryPages({ accountId, endpoint }: HistoryProps) {
-  const headingId = useId();
+  const internalId = useId();
+  const headingId = endpoint ? internalId : "customer-earlier-orders";
   const [cursors, setCursors] = useState<(string | null)[]>([null]);
   const [result, setResult] = useState<QueryResult | null>(null);
   const current = result?.cursors === cursors ? result : null;
@@ -146,7 +245,10 @@ function OrderHistoryPages({ accountId, endpoint }: HistoryProps) {
     const request = new AbortController();
     async function readPage() {
       try {
-        const url = new URL(endpoint ?? "/v1/auth/orders", API_URL);
+        const url = new URL(
+          API_URL + (endpoint ?? "/v1/auth/orders"),
+          window.location.origin,
+        );
         const after = cursors.at(-1);
         if (after) url.searchParams.set("after", after);
         const response = await fetch(url, {
@@ -180,14 +282,24 @@ function OrderHistoryPages({ accountId, endpoint }: HistoryProps) {
 
   const page = current?.page;
   return (
-    <section className="customer-history" aria-labelledby={headingId}>
-      <h2 id={headingId}>Order history</h2>
+    <section className="account-order-history" aria-labelledby={headingId}>
+      <header className="account-order-heading">
+        <h2 id={headingId}>
+          {endpoint ? "Order history" : "Earlier pickup receipts"}
+        </h2>
+      </header>
       {!current ? (
-        <p role="status">Loading orders…</p>
+        <p className="account-order-message" role="status">
+          Loading orders…
+        </p>
       ) : current.error ? (
-        <div role="alert">
-          <p>{current.error}</p>
-          <button type="button" onClick={() => setCursors([...cursors])}>
+        <div className="account-order-message">
+          <p role="alert">{current.error}</p>
+          <button
+            type="button"
+            className="account-order-action"
+            onClick={() => setCursors([...cursors])}
+          >
             Try again
           </button>
         </div>
@@ -195,33 +307,27 @@ function OrderHistoryPages({ accountId, endpoint }: HistoryProps) {
         page && (
           <>
             {page.orders.length ? (
-              <div className="receipt-list">
+              <div className="account-order-list">
                 {page.orders.map((order) => (
                   <OrderReceipt key={order.id} order={order} />
                 ))}
               </div>
             ) : (
-              <div className="history-empty">
+              <div className="account-order-message">
                 <h3>
                   {cursors.length === 1
-                    ? "No pickup orders yet."
+                    ? "No earlier pickup receipts."
                     : "You’ve reached your earliest order."}
                 </h3>
-                {cursors.length === 1 && (
-                  <>
-                    <p>Orders placed with this account will appear here.</p>
-                    {!endpoint && (
-                      <Link className="text-link" href="/menu/">
-                        Browse the menu <span aria-hidden="true">↗</span>
-                      </Link>
-                    )}
-                  </>
-                )}
               </div>
             )}
             {(cursors.length > 1 || page.nextCursor) && (
-              <nav aria-label="Order history pages">
+              <nav
+                className="account-order-paging"
+                aria-label="Order history pages"
+              >
                 <button
+                  className="account-order-action"
                   type="button"
                   disabled={cursors.length === 1}
                   onClick={() => setCursors(cursors.slice(0, -1))}
@@ -229,6 +335,7 @@ function OrderHistoryPages({ accountId, endpoint }: HistoryProps) {
                   ← Newer orders
                 </button>
                 <button
+                  className="account-order-action"
                   type="button"
                   disabled={!page.nextCursor}
                   onClick={() => {

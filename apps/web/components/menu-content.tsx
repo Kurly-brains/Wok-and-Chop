@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import InkInscription from "./ink-inscription";
 import {
   formatMoney,
@@ -10,12 +11,15 @@ import {
   type PricedLine,
 } from "@wok/domain";
 import { useRequestedCategory } from "../lib/use-requested-category";
+import { canAddDish, dishOptionGroups } from "../lib/dish-options";
 import { searchLunchMenu } from "../lib/menu-search";
+import { pickupCheckoutUrl, uberEatsUrl } from "../lib/ordering";
 import "../styles/menu.css";
 
 type Props = {
   items: readonly MenuItem[];
-  onChoose: (item: MenuItem) => void;
+  onView: (item: MenuItem) => void;
+  onAdd: (item: MenuItem) => void;
   lines: (PricedLine & { key: string })[];
   subtotal: number;
   onBag: () => void;
@@ -32,11 +36,13 @@ const legacyCategories: Record<string, string> = {
 function DishCard({
   item,
   quantity,
-  onChoose,
+  onView,
+  onAdd,
 }: {
   item: MenuItem;
   quantity: number;
-  onChoose: Props["onChoose"];
+  onView: Props["onView"];
+  onAdd: Props["onAdd"];
 }) {
   const [failedImage, setFailedImage] = useState<string | null>(null);
   const hasImage = Boolean(item.image && failedImage !== item.image);
@@ -46,8 +52,12 @@ function DishCard({
   const styles = item.modifierGroups?.find(
     (group) => group.id === "lunch-style",
   );
-  const preparations = item.modifierGroups?.find((group) => group.id === "lunch-preparation")
+  const preparations = item.modifierGroups
+    ?.find((group) => group.id === "lunch-preparation")
     ?.options.filter((option) => option.available !== false);
+  const hasOptions = dishOptionGroups(item).length > 0;
+  const orderable = canAddDish(item);
+  const addLabel = quantity > 0 ? "Add more" : "Add";
   return (
     <article
       className={`menu-dish-card${quantity > 0 ? " is-added" : ""}`}
@@ -56,8 +66,10 @@ function DishCard({
     >
       <button
         className={`menu-dish-photo is-${item.imagePresentation ?? "photo"}`}
-        onClick={() => onChoose(item)}
-        aria-label={`View ${item.name} and options`}
+        type="button"
+        onClick={() => onView(item)}
+        aria-label={`View ${item.name} details`}
+        aria-haspopup="dialog"
       >
         {hasImage ? (
           <img
@@ -107,10 +119,9 @@ function DishCard({
       </button>
       <div className="menu-dish-copy">
         <h2 id={`dish-title-${item.id}`}>{item.name}</h2>
-        <p className="menu-dish-description">
-          {item.description ||
-            "A Hakka Chinese lunch, with your choice of accompaniments."}
-        </p>
+        {item.description && (
+          <p className="menu-dish-description">{item.description}</p>
+        )}
         <p className="menu-dish-flags">
           {item.vegetarian && <span>Vegetarian</span>}
           {item.heatLevel ? (
@@ -134,11 +145,22 @@ function DishCard({
         <div className="menu-dish-actions">
           <strong>{formatMoney(item.priceCents)}</strong>
           <button
-            onClick={() => onChoose(item)}
-            aria-label={`Add ${item.name} to bag`}
+            type="button"
+            onClick={() => onAdd(item)}
+            disabled={!orderable}
+            aria-haspopup={hasOptions && orderable ? "dialog" : undefined}
+            aria-label={
+              !orderable
+                ? `${item.name} is unavailable`
+                : hasOptions
+                  ? `Options for ${item.name}`
+                  : `${addLabel} ${item.name} to bag`
+            }
           >
-            {quantity > 0 ? "Add more" : "Add"}
-            <span aria-hidden="true">+</span>
+            {orderable ? (hasOptions ? "Options" : addLabel) : "Unavailable"}
+            {orderable && (
+              <span aria-hidden="true">{hasOptions ? "›" : "+"}</span>
+            )}
           </button>
         </div>
       </div>
@@ -148,7 +170,8 @@ function DishCard({
 
 export default function MenuContent({
   items,
-  onChoose,
+  onView,
+  onAdd,
   lines,
   subtotal,
   onBag,
@@ -173,12 +196,50 @@ export default function MenuContent({
         <img src="/images/hakka-table.jpg" alt="" fetchPriority="high" />
         <div>
           <p>Wok &amp; Chop</p>
-          <h1 id="menu-title">Menu <InkInscription>菜單</InkInscription></h1>
+          <h1 id="menu-title">
+            Menu <InkInscription>菜單</InkInscription>
+          </h1>
           <span>Hakka Chinese. Made for your table.</span>
         </div>
       </header>
       <div className="menu-page-content">
+        <section className="menu-order-guide" aria-label="Pickup and delivery">
+          <div>
+            <h2>Pickup</h2>
+            <p>Choose dishes here and collect your order at Wok &amp; Chop.</p>
+            {count ? (
+              <Link
+                className="wc-order-method wc-order-method--direct"
+                href={pickupCheckoutUrl}
+              >
+                Continue to pickup <span aria-hidden="true">→</span>
+              </Link>
+            ) : (
+              <a
+                className="wc-order-method wc-order-method--direct"
+                href="#menu-choices"
+              >
+                Choose dishes for pickup <span aria-hidden="true">↓</span>
+              </a>
+            )}
+          </div>
+          <div>
+            <h2>Home delivery</h2>
+            <p>Order through Uber Eats for delivery to your door.</p>
+            <a className="wc-order-method" href={uberEatsUrl}>
+              <img
+                className="menu-order-uber"
+                src="/images/brand/uber-eats-horizontal.svg"
+                alt="Uber Eats"
+                width={105}
+                height={17}
+              />
+              <span aria-hidden="true">↗</span>
+            </a>
+          </div>
+        </section>
         <div
+          id="menu-choices"
           className="menu-category-tabs"
           role="group"
           aria-label="Lunch categories"
@@ -207,11 +268,11 @@ export default function MenuContent({
             </p>
           </div>
           <p>
-            Every lunch entrée includes jasmine rice, a vegetable spring roll
-            and your choice of soup of the day or pop. Fried rice +
-            {formatMoney(lunchMenuDetails.friedRiceUpgradeCents)}. Dry
-            preparation +{formatMoney(lunchMenuDetails.dryPreparationCents)}{" "}
-            where available.
+            Check each dish for included sides and available options. Where
+            offered, fried rice adds{" "}
+            {formatMoney(lunchMenuDetails.friedRiceUpgradeCents)} and dry
+            preparation adds {formatMoney(lunchMenuDetails.dryPreparationCents)}
+            .
           </p>
         </div>
         <div className="menu-grid-toolbar">
@@ -254,7 +315,8 @@ export default function MenuContent({
               key={item.id}
               item={item}
               quantity={quantities.get(item.id) ?? 0}
-              onChoose={onChoose}
+              onView={onView}
+              onAdd={onAdd}
             />
           ))}
         </div>
@@ -281,9 +343,6 @@ export default function MenuContent({
           <p>
             Groups of 7 or more: a 15% gratuity will be automatically added to
             the bill.
-          </p>
-          <p>
-            Online ordering opens soon. No payments or orders are accepted yet.
           </p>
         </footer>
       </div>

@@ -1,5 +1,7 @@
 "use client";
 import Link from "next/link";
+import type { MenuCatalogItem } from "@wok/domain";
+import { catalogDish } from "../lib/featured-dishes";
 import {
   useCallback,
   useEffect,
@@ -15,7 +17,7 @@ const stories = [
     title: "The first sizzle.",
     chapter: "Fire & flavour",
     inscription: "鑊氣",
-    image: "/images/chicken-cutout.webp",
+    dishId: "lunch-chilli-chicken",
     text: "A hot wok. A quick toss. That first rush of aroma. Some food stories begin in the kitchen, long before the first bite reaches the table.",
     note: "A little fire brings the story to life.",
   },
@@ -23,7 +25,7 @@ const stories = [
     title: "One more strand.",
     chapter: "Noodles & conversation",
     inscription: "家常",
-    image: "/images/noodles-cutout.webp",
+    dishId: "lunch-chicken-chow-mein",
     text: "Lift a few noodles, pass a plate, pick up the conversation. There is a lovely rhythm to a meal that gives everyone a reason to stay a little longer.",
     note: "Good company makes a generous helping.",
   },
@@ -31,7 +33,7 @@ const stories = [
     title: "That little crunch.",
     chapter: "Texture & contrast",
     inscription: "功夫",
-    image: "/images/spring-rolls-cutout.webp",
+    dishId: "crispy-spring-rolls",
     text: "The crisp first bite. A soft centre. A little dip on the side. Sometimes the smallest things on the table are the ones everyone reaches for.",
     note: "Small bites. Plenty to talk about.",
   },
@@ -39,7 +41,7 @@ const stories = [
     title: "Room for everyone.",
     chapter: "Around the table",
     inscription: "入席",
-    image: "/images/lunch-veg-manchurian.webp",
+    dishId: "lunch-veg-manchurian",
     text: "Something warm in the middle of the table, a few plates passed from hand to hand, and no hurry to leave. That is the kind of food story we love.",
     note: "The best part is sharing it.",
   },
@@ -60,7 +62,8 @@ function subscribe(callback: () => void) {
 const motionSnapshot = () =>
   window.matchMedia("(prefers-reduced-motion: reduce)").matches;
 
-export default function FoodStories() {
+export default function FoodStories({ items }: { items: readonly MenuCatalogItem[] }) {
+  const photos = stories.map(story => catalogDish(items, story.dishId));
   const track = useRef<HTMLDivElement>(null);
   const drag = useRef<{
     pointerId: number;
@@ -261,15 +264,16 @@ export default function FoodStories() {
             aria-hidden={copy !== MIDDLE_COPY ? true : undefined}
           >
             <div className="food-story-art">
-              <img
-                src={story.image}
+              {photos[index]?.image && <img
+                src={photos[index].image}
                 alt=""
                 aria-hidden="true"
                 width="900"
                 height="900"
                 loading="lazy"
                 draggable={false}
-              />
+                data-image={photos[index].imagePresentation}
+              />}
             </div>
             <div className="food-story-panel">
               <div className="food-story-chapter">

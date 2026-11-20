@@ -7,5 +7,6 @@ dist/
 !.env.example
 *.tsbuildinfo
 .findex_db/
+.vercel/
 .DS_Store
 coverage/

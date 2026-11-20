@@ -2,30 +2,30 @@
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import {
-  DomainError,
-  formatMoney,
-  priceLine,
-  type CartSelection,
-} from "@wok/domain";
+import { DomainError, priceLine, type CartSelection } from "@wok/domain";
 import { setCart, type CartLine } from "../lib/cart-store";
 import {
+  DeliveryRequestError,
   deliveryStages,
   requestDelivery,
   type Delivery,
 } from "../lib/delivery";
-import { API_URL } from "../lib/customer-session";
+import { API_URL, refreshCustomer } from "../lib/customer-session";
 import { getMenuCatalogSnapshot } from "../lib/menu-catalog";
+import { pickupCheckoutUrl } from "../lib/ordering";
+import { AccountOrderCard } from "./customer-order-history";
 
 type Page = {
   accountId: string;
   deliveries: Delivery[];
   nextCursor: string | null;
 };
-const orderDate = new Intl.DateTimeFormat("en-CA", {
-  dateStyle: "medium",
-  timeZone: "America/Toronto",
-});
+function deliveryLabel(status: string) {
+  return status === "CANCELLED"
+    ? "Cancelled"
+    : (deliveryStages.find((stage) => stage.id === status)?.label ??
+        "Status unavailable");
+}
 
 function ReorderDelivery({
   delivery,
@@ -105,19 +105,24 @@ function ReorderDelivery({
   }
 
   return (
-    <div className="delivery-reorder">
-      <div className="delivery-actions">
+    <div className="account-order-reorder">
+      <div>
         {added ? (
-          <Link className="text-link" href="/delivery/" ref={reviewLink}>
-            Review for delivery <span aria-hidden="true">→</span>
+          <Link
+            className="account-order-action"
+            href={pickupCheckoutUrl}
+            ref={reviewLink}
+          >
+            Review for pickup <span aria-hidden="true">→</span>
           </Link>
         ) : (
           <button
             type="button"
+            className="account-order-action"
             disabled={pending}
             onClick={() => void reorder()}
           >
-            {pending ? "Checking the menu…" : "Add to your bag again"}
+            {pending ? "Checking the menu…" : "Add these dishes for pickup"}
           </button>
         )}
       </div>
@@ -167,99 +172,117 @@ export default function CustomerDeliveries({
           throw new Error("Delivery account has changed.");
         if (!controller.signal.aborted) setResult({ pages, data });
       })
-      .catch(() => {
-        if (!controller.signal.aborted)
-          setResult({
-            pages,
-            error: "Delivery history is unavailable. Please try again.",
-          });
+      .catch((error) => {
+        if (controller.signal.aborted) return;
+        if (
+          !manager &&
+          error instanceof DeliveryRequestError &&
+          error.status === 401
+        )
+          void refreshCustomer();
+        setResult({
+          pages,
+          error: "Delivery history is unavailable. Please try again.",
+        });
       });
     return () => controller.abort();
   }, [accountId, manager, cursor, pages]);
 
   return (
-    <section className="customer-history" aria-labelledby="customer-deliveries">
-      <h2 id="customer-deliveries">Delivery history</h2>
+    <section
+      className="account-order-history"
+      aria-labelledby="customer-deliveries"
+    >
+      <header className="account-order-heading">
+        <h2 id="customer-deliveries">
+          {manager ? "Delivery history" : "Earlier deliveries"}
+        </h2>
+        {!manager && (
+          <Link
+            className="account-order-action"
+            href="/delivery/tracking/#track"
+          >
+            Track with a code <span aria-hidden="true">→</span>
+          </Link>
+        )}
+      </header>
       {!current ? (
-        <p role="status">Loading deliveries…</p>
+        <p className="account-order-message" role="status">
+          Loading deliveries…
+        </p>
       ) : current.error ? (
-        <>
+        <div className="account-order-message">
           <p role="alert">{current.error}</p>
-          <button type="button" onClick={() => setPages([...pages])}>
+          <button
+            type="button"
+            className="account-order-action"
+            onClick={() => setPages([...pages])}
+          >
             Try again
           </button>
-        </>
+        </div>
       ) : current.data?.deliveries.length ? (
-        <>
+        <div className="account-order-list">
           {current.data.deliveries.map((delivery) => (
-            <details key={delivery.id} className="pickup-receipt">
-              <summary>
-                <span className="receipt-number">
-                  Order {delivery.number}
-                  <time dateTime={delivery.createdAt}>
-                    {orderDate.format(new Date(delivery.createdAt))}
-                  </time>
-                </span>
-                <span className="receipt-state" data-state={delivery.status}>
-                  {deliveryStages.find((stage) => stage.id === delivery.status)
-                    ?.label ?? "Cancelled"}
-                </span>
-                <strong className="receipt-total">
-                  {formatMoney(delivery.totalCents)}
-                </strong>
-              </summary>
-              <div className="receipt-body">
-                <ul className="receipt-items receipt-items--delivery">
-                  {delivery.items.map((item, index) => (
-                    <li key={index}>
-                      <span>
-                        {item.quantity} × {item.name}
-                        {item.modifiers.length > 0 && (
-                          <small>{item.modifiers.join(" · ")}</small>
-                        )}
-                      </span>
-                      <strong>{formatMoney(item.lineTotalCents)}</strong>
-                    </li>
-                  ))}
-                </ul>
-                {!manager && (
-                  <ReorderDelivery delivery={delivery} accountId={accountId} />
-                )}
-              </div>
-            </details>
+            <AccountOrderCard
+              key={delivery.id}
+              reference={delivery.number}
+              createdAt={delivery.createdAt}
+              statusCode={delivery.status}
+              statusLabel={deliveryLabel(delivery.status)}
+              items={delivery.items}
+              subtotalCents={delivery.subtotalCents}
+              discountCents={delivery.discountCents}
+              totalCents={delivery.totalCents}
+              updates={delivery.statusHistory?.map(({ at, status }) => ({
+                at,
+                label: deliveryLabel(status),
+              }))}
+            >
+              {!manager && (
+                <ReorderDelivery delivery={delivery} accountId={accountId} />
+              )}
+            </AccountOrderCard>
           ))}
-          <div className="delivery-actions">
-            {pages.length > 1 && (
-              <button
-                type="button"
-                onClick={() => setPages(pages.slice(0, -1))}
-              >
-                Newer deliveries
-              </button>
-            )}
-            {current.data.nextCursor && (
-              <button
-                type="button"
-                onClick={() =>
-                  setPages([...pages, current.data?.nextCursor ?? null])
-                }
-              >
-                Older deliveries
-              </button>
-            )}
-          </div>
-        </>
+        </div>
       ) : (
-        <p>
-          {manager
-            ? "This customer has no linked delivery orders."
-            : "Delivery orders placed while signed in will appear here."}
-        </p>
+        <div className="account-order-message">
+          <h3>
+            {pages.length > 1
+              ? "No older delivery orders."
+              : "No earlier deliveries."}
+          </h3>
+          {!manager && pages.length === 1 && (
+            <p>Past delivery orders linked to your account appear here.</p>
+          )}
+        </div>
       )}
-      {!manager && (
-        <Link className="text-link" href="/delivery/#track">
-          Track with a private code <span aria-hidden="true">↗</span>
-        </Link>
+      {current?.data && (pages.length > 1 || current.data.nextCursor) && (
+        <nav
+          className="account-order-paging"
+          aria-label="Delivery history pages"
+        >
+          {pages.length > 1 && (
+            <button
+              className="account-order-action"
+              type="button"
+              onClick={() => setPages(pages.slice(0, -1))}
+            >
+              Newer deliveries
+            </button>
+          )}
+          {current.data.nextCursor && (
+            <button
+              className="account-order-action"
+              type="button"
+              onClick={() =>
+                setPages([...pages, current.data?.nextCursor ?? null])
+              }
+            >
+              Older deliveries
+            </button>
+          )}
+        </nav>
       )}
     </section>
   );

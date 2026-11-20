@@ -1,16 +1,21 @@
 import Link from "next/link";
-import { lunchMenuDetails } from "@wok/domain";
+import { lunchMenuDetails, type MenuCatalogItem } from "@wok/domain";
+import { catalogDish, featuredDishes } from "../lib/featured-dishes";
 import InkInscription from "./ink-inscription";
 import "../styles/footer-feast.css";
 
-export default function FooterFeast() {
+export default function FooterFeast({ items }: { items: readonly MenuCatalogItem[] }) {
+  const noodles = catalogDish(items, "lunch-chicken-chow-mein");
+  const bowl = noodles?.imagePresentation === "cutout" && noodles.image
+    ? noodles.image
+    : featuredDishes(items).find(item => item.imagePresentation === "cutout" && item.image)?.image;
   return (
-    <section className="footer-feast" aria-labelledby="footer-feast-title">
+    <section className={`footer-feast${bowl ? "" : " footer-feast--copy-only"}`} aria-labelledby="footer-feast-title">
       <div className="footer-feast-inner">
-        <div className="footer-feast-art" aria-hidden="true">
+        {bowl && <div className="footer-feast-art" aria-hidden="true">
           <img
             className="footer-feast-bowl"
-            src="/images/noodles-cutout.webp"
+            src={bowl}
             width="1200"
             height="1200"
             alt=""
@@ -26,7 +31,7 @@ export default function FooterFeast() {
             loading="lazy"
             decoding="async"
           />
-        </div>
+        </div>}
         <div className="footer-feast-copy">
           <div className="footer-feast-heading">
             <h2 id="footer-feast-title">Lunch in Kanata.</h2>

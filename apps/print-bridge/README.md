@@ -1,8 +1,10 @@
 # Local printer diagnostics
 
-Open the [Thermal printer setup guide](http://127.0.0.1:3000/staff/printer-guide/) for station preparation, Windows and Linux configuration, paper checks and missing-ticket recovery. With the local API running, open **Training board → Kitchen printer** to produce a fixed setup ticket. The simulator writes a `.prn` file, reads it back and compares the contents. It uses the kitchen ticket formatter and a virtual spool. The latest result is also available with `node apps/print-bridge/check.cjs status`.
+For the current Windows PC / USB printer workflow, use [Windows printer connection](WINDOWS.md). That manager-only connection uses an explicitly selected installed queue and durable PostgreSQL dispatch records. The older CLI specimen tools below remain qualification utilities; their simulator is not printer readiness.
 
-The commands below run from the repository root with Node 24. SQLite keeps each specimen, its SHA-256 digest, target, timestamp and outcome. Files live in `~/.wok-and-chop/printer/` by default. Set `WOK_PRINTER_DIAGNOSTICS_DIR` to a directory owned by the local service user to use another location. Run the CLI and API on the same workstation with the same data directory to see CLI outcomes in Staff. Each ID identifies one dispatch. Reusing it reads the existing result.
+The CLI simulator writes a `.prn` file, reads it back and compares the contents with the kitchen ticket formatter. Use `node apps/print-bridge/check.cjs status` to view the latest CLI result.
+
+The commands below run from the repository root with Node 24. SQLite keeps each specimen, its SHA-256 digest, target, timestamp and outcome. Files live in `~/.wok-and-chop/printer/` by default. Set `WOK_PRINTER_DIAGNOSTICS_DIR` to a directory owned by the local service user to use another location. Each ID identifies one dispatch. Reusing it reads the existing result.
 
 1. Run `node apps/print-bridge/check.cjs simulate counter-sim-01` to test the virtual spool.
 2. At the restaurant, identify the wired 80 mm printer and confirm the exact model and firmware support ESC/POS printing and a raw TCP port. Set `WOK_PRINTER_IPV4` to its private LAN IPv4 address and `WOK_PRINTER_PORT` to its configured port (default 9100). The bridge opens an outbound socket to that address only.

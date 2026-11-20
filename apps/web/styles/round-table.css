@@ -152,6 +152,9 @@
 }
 
 @media (max-width: 735px) {
+  .layer-hero.has-round-table .round-table {
+    width: min(137%, 704px);
+  }
   .round-table .dish-noodles {
     left: 35%;
     top: 30%;

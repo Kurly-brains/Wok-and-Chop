@@ -1,8 +1,8 @@
 "use client";
 import { useEffect, useSyncExternalStore } from "react";
 export type Customer = { id: string; name: string; email: string };
-export const API_URL =
-  process.env.NEXT_PUBLIC_API_BASE_URL ?? "http://127.0.0.1:4000";
+export const API_URL = (process.env.NEXT_PUBLIC_API_BASE_URL ?? "").replace(/\/+$/, "");
+export const accountSessionChange = "wok-account-session-change";
 let customer: Customer | null = null;
 let requestSequence = 0;
 let mutationPending = false;
@@ -34,6 +34,15 @@ function publish(next: Customer | null) {
   customer = next;
   listeners.forEach((callback) => callback());
 }
+
+export function announceAccountSessionChanged() {
+  window.dispatchEvent(new Event(accountSessionChange));
+  try {
+    window.localStorage.setItem(accountSessionChange, crypto.randomUUID());
+  } catch {
+    // Other tabs still recheck their sessions on focus.
+  }
+}
 export async function refreshCustomer() {
   // A background read must not overwrite an in-flight sign-in or logout.
   if (mutationPending) return customer;
@@ -62,8 +71,17 @@ export function useCustomer() {
     const refresh = () => {
       void refreshCustomer();
     };
+    function sessionChanged(event: StorageEvent) {
+      if (event.key !== accountSessionChange) return;
+      publish(null);
+      void refreshCustomer();
+    }
     window.addEventListener("focus", refresh);
-    return () => window.removeEventListener("focus", refresh);
+    window.addEventListener("storage", sessionChanged);
+    return () => {
+      window.removeEventListener("focus", refresh);
+      window.removeEventListener("storage", sessionChanged);
+    };
   }, []);
   return user;
 }
@@ -118,6 +136,7 @@ export async function authRequest(
       ++requestSequence;
       publish(next);
     }
+    announceAccountSessionChanged();
   } finally {
     mutationPending = false;
   }

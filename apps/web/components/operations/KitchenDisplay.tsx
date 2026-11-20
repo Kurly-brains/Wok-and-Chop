@@ -29,7 +29,7 @@ export function KitchenDisplay() {
   const filtered = onlyAllergies ? active.filter(order => order.allergy) : active;
   const held = service.orders.filter(order => order.fulfillment === "SCHEDULED");
 
-  return <OperationsShell active="kitchen" training><main className="ops-main ops-kitchen-main" id="main-content" tabIndex={-1}>
+  return <OperationsShell active="kitchen"><main className="ops-main ops-kitchen-main" id="main-content" tabIndex={-1}>
     <div className="ops-title-row"><div><p className="ops-service-date">Kitchen · Main station</p><h1>Kitchen display</h1><p>{active.length} active pickup tickets · Earliest pickup first</p></div>
       <div className="ops-kitchen-clock"><strong>{now ? restaurantTime(new Date(now).toISOString()) : "—"}</strong><span>Toronto time</span></div>
     </div>

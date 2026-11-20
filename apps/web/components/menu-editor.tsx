@@ -4,9 +4,11 @@ import { useEffect, useRef, useState } from "react";
 import { API_URL, authRequest, useCustomer } from "../lib/customer-session";
 import { ManagerSignIn } from "./operations/ManagerSignIn";
 import { OperationsShell } from "./operations/OperationsShell";
-import { formatMoney, isLunchMenuItem, lunchCategories } from "@wok/domain";
+import { availableDishModifierGroups, formatMoney, isLunchMenuItem, lunchCategories } from "@wok/domain";
 import {
+  createPublishedMenuItem,
   getMenuCatalogSnapshot,
+  getPublishedMenuVersion,
   publishMenuItem,
   refreshPublishedMenu,
   resetPublishedMenu,
@@ -20,13 +22,30 @@ type Draft = {
   categoryId: string;
   price: string;
   available: boolean;
+  archived: boolean;
+  featured: boolean;
   image: string;
   imagePresentation: "photo" | "cutout";
   heatLevel: 0 | 1 | 2;
   containsPeanuts: boolean;
+  modifierGroupIds: readonly string[];
 };
 const menuCategories = lunchCategories;
 const MAX_FILE_BYTES = 350 * 1024;
+const emptyDraft: Draft = {
+  name: "",
+  description: "",
+  categoryId: "",
+  price: "",
+  available: true,
+  archived: false,
+  featured: false,
+  image: "",
+  imagePresentation: "photo",
+  heatLevel: 0,
+  containsPeanuts: false,
+  modifierGroupIds: [],
+};
 function draftFrom(item: MenuCatalogItem): Draft {
   return {
     name: item.name,
@@ -34,10 +53,13 @@ function draftFrom(item: MenuCatalogItem): Draft {
     categoryId: item.categoryId,
     price: (item.priceCents / 100).toFixed(2),
     available: item.available !== false,
+    archived: item.archived === true,
+    featured: item.featured === true,
     image: item.image ?? "",
     imagePresentation: item.imagePresentation ?? "photo",
     heatLevel: item.heatLevel ?? 0,
     containsPeanuts: item.containsPeanuts ?? false,
+    modifierGroupIds: item.modifierGroups?.map(group => group.id) ?? [],
   };
 }
 function snapshot(item: MenuCatalogItem) {
@@ -121,24 +143,42 @@ function DishEditor({
   item,
   onDirty,
   onSaved,
+  onArchiveChange,
   onReload,
 }: {
-  item: MenuCatalogItem;
+  item: MenuCatalogItem | null;
   onDirty(value: boolean): void;
-  onSaved(): void;
+  onSaved(item: MenuCatalogItem): void;
+  onArchiveChange(item: MenuCatalogItem): void;
   onReload(): void;
 }) {
-  const [draft, setDraft] = useState(() => draftFrom(item));
-  const [baseSnapshot, setBaseSnapshot] = useState(() => snapshot(item));
+  const creating = item === null;
+  const [draft, setDraft] = useState(() => (item ? draftFrom(item) : emptyDraft));
+  const [baseSnapshot, setBaseSnapshot] = useState(() => JSON.stringify(draft));
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [imageFailed, setImageFailed] = useState(false);
+  const [confirmArchive, setConfirmArchive] = useState(false);
   const uploadSequence = useRef(0);
   const uploadInput = useRef<HTMLInputElement>(null);
-  const changedElsewhere = snapshot(item) !== baseSnapshot;
+  const heading = useRef<HTMLHeadingElement>(null);
+  const archiveHeading = useRef<HTMLHeadingElement>(null);
+  const archiveButton = useRef<HTMLButtonElement>(null);
+  const saveInFlight = useRef(false);
+  const createAttempt = useRef<{ payload: string; requestId: string } | null>(null);
+  const changedElsewhere = item !== null && snapshot(item) !== baseSnapshot;
   const dirty = JSON.stringify(draft) !== baseSnapshot;
+  const availableGroups = draft.categoryId
+    ? availableDishModifierGroups({ id: item?.id, categoryId: draft.categoryId })
+    : [];
+  useEffect(() => {
+    if (creating) heading.current?.focus();
+  }, [creating]);
+  useEffect(() => {
+    if (confirmArchive) archiveHeading.current?.focus();
+  }, [confirmArchive]);
   useEffect(
     () => () => {
       uploadSequence.current += 1;
@@ -161,6 +201,20 @@ function DishEditor({
     onDirty(JSON.stringify(next) !== baseSnapshot);
     if (patch.image !== undefined) setImageFailed(false);
   }
+  function changeCategory(categoryId: string) {
+    const groups = availableDishModifierGroups({ id: item?.id, categoryId });
+    change({
+      categoryId,
+      modifierGroupIds: groups.filter(group => draft.modifierGroupIds.includes(group.id)).map(group => group.id),
+    });
+  }
+  function selectGroup(id: string, checked: boolean) {
+    change({
+      modifierGroupIds: availableGroups
+        .filter(group => group.id === id ? checked : draft.modifierGroupIds.includes(group.id))
+        .map(group => group.id),
+    });
+  }
   async function upload(file?: File) {
     if (!file) return;
     const sequence = ++uploadSequence.current;
@@ -182,43 +236,82 @@ function DishEditor({
       if (uploadInput.current) uploadInput.current.value = "";
     }
   }
+  function checkCurrentDish(id: string) {
+    const current = getMenuCatalogSnapshot().find((entry) => entry.id === id);
+    if (!current || snapshot(current) !== baseSnapshot)
+      throw new Error("The published dish changed. Reload its details before saving.");
+  }
   async function save(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    if (saving) return;
+    if (saveInFlight.current || uploading) return;
+    saveInFlight.current = true;
     setError("");
     setNotice("");
     setSaving(true);
     try {
-      const current = getMenuCatalogSnapshot().find(
-        (dish) => dish.id === item.id,
-      );
-      if (!current || snapshot(current) !== baseSnapshot)
-        throw new Error(
-          "The published dish changed. Reload its details before saving.",
-        );
-      const saved = await publishMenuItem(item.id, {
+      const previousGroups = item?.modifierGroups?.map(group => group.id) ?? [];
+      const includeGroups = creating || draft.categoryId !== item?.categoryId ||
+        draft.modifierGroupIds.join(",") !== previousGroups.join(",");
+      const dish = {
         name: draft.name.trim(),
         description: draft.description.trim(),
         categoryId: draft.categoryId,
         priceCents: centsFrom(draft.price),
         available: draft.available,
+        featured: draft.featured,
         image: draft.image || null,
         imagePresentation: draft.imagePresentation,
         heatLevel: draft.heatLevel,
         containsPeanuts: draft.containsPeanuts,
-      });
+        ...(includeGroups ? { modifierGroupIds: draft.modifierGroupIds } : {}),
+      };
+      let saved: MenuCatalogItem;
+      if (item) {
+        checkCurrentDish(item.id);
+        saved = await publishMenuItem(item.id, dish);
+      } else {
+        const payload = JSON.stringify(dish);
+        if (createAttempt.current?.payload !== payload)
+          createAttempt.current = { payload, requestId: crypto.randomUUID() };
+        saved = await createPublishedMenuItem(
+          dish,
+          getPublishedMenuVersion(),
+          createAttempt.current.requestId,
+        );
+      }
       setDraft(draftFrom(saved));
       setBaseSnapshot(snapshot(saved));
       onDirty(false);
-      onSaved();
-      setNotice("Published. The lunch menu now uses these details.");
+      onSaved(saved);
+      setNotice(saved.archived ? "Saved to this archived dish." : "Published. The lunch menu now uses these details.");
     } catch (err) {
       setError(
         err instanceof Error
           ? err.message
           : "Changes could not be saved. Your edits are still here.",
       );
-    } finally { setSaving(false); }
+    } finally {
+      saveInFlight.current = false;
+      setSaving(false);
+    }
+  }
+  async function updateArchive(archived: boolean) {
+    if (!item || dirty || changedElsewhere || saveInFlight.current || uploading) return;
+    saveInFlight.current = true;
+    setSaving(true);
+    setError("");
+    setNotice("");
+    try {
+      checkCurrentDish(item.id);
+      const saved = await publishMenuItem(item.id, { archived });
+      setConfirmArchive(false);
+      onArchiveChange(saved);
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : "The dish's archive status could not be changed.");
+    } finally {
+      saveInFlight.current = false;
+      setSaving(false);
+    }
   }
   let priceLabel = "Enter a price";
   try {
@@ -230,11 +323,13 @@ function DishEditor({
     <div className="menu-editor-detail">
       <div className="menu-editor-detail-title">
         <div>
-          <span>Lunch dish details</span>
-          <h2>{draft.name || "Untitled dish"}</h2>
+          <span>{creating ? "New menu item" : "Lunch dish details"}</span>
+          <h2 ref={heading} tabIndex={creating ? -1 : undefined}>
+            {creating ? "Add a dish" : draft.name || "Untitled dish"}
+          </h2>
         </div>
         <span className="menu-editor-save-state">
-          {dirty ? "Unsaved changes" : "Published"}
+          {dirty ? "Unsaved changes" : creating ? "Draft" : draft.archived ? "Archived" : "Published"}
         </span>
       </div>
       {changedElsewhere && (
@@ -246,7 +341,7 @@ function DishEditor({
         </div>
       )}
       <form onSubmit={save}>
-        <div className="menu-editor-columns">
+        <fieldset className="menu-editor-columns" disabled={saving} aria-label="Dish details">
           <div className="menu-editor-fields">
             <label>
               Dish name
@@ -272,11 +367,12 @@ function DishEditor({
               <label>
                 Category
                 <select
+                  aria-label="Dish category"
                   value={draft.categoryId}
-                  onChange={(event) =>
-                    change({ categoryId: event.target.value })
-                  }
+                  onChange={(event) => changeCategory(event.target.value)}
+                  required
                 >
+                  {creating && <option value="" disabled>Choose a category</option>}
                   {menuCategories.map((category) => (
                     <option value={category.id} key={category.id}>
                       {category.name}
@@ -298,6 +394,40 @@ function DishEditor({
                 </div>
               </label>
             </div>
+            <fieldset className="menu-editor-dish-options">
+              <legend>Guest options for this dish</legend>
+              {availableGroups.length > 0 && (
+                <div className="menu-editor-dish-options-grid">
+                  {availableGroups.map((group) => {
+                    const checked = draft.modifierGroupIds.includes(group.id);
+                    return (
+                      <label key={group.id} className={checked ? "is-selected" : undefined}>
+                        <input
+                          type="checkbox"
+                          checked={checked}
+                          onChange={event => selectGroup(group.id, event.target.checked)}
+                        />
+                        <span>
+                          <strong>{group.name}</strong>
+                          <small>
+                            {group.options.filter(option => option.available !== false).map((option) =>
+                              option.priceCents > 0
+                                ? `${option.name} (+${formatMoney(option.priceCents)})`
+                                : option.name,
+                            ).join(" · ")}
+                          </small>
+                        </span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+              <p>{!draft.categoryId
+                ? "Choose a category to see its options."
+                : draft.modifierGroupIds.length
+                  ? "Guests choose from the selected groups when adding this dish."
+                  : "Guests add this dish straight to their bag."}</p>
+            </fieldset>
             <label className="menu-editor-availability">
               <input
                 type="checkbox"
@@ -309,6 +439,17 @@ function DishEditor({
               <span>
                 <strong>Available on the lunch menu</strong>
                 <small>Uncheck to hide this dish from the customer menu.</small>
+              </span>
+            </label>
+            <label className="menu-editor-availability">
+              <input
+                type="checkbox"
+                checked={draft.featured}
+                onChange={(event) => change({ featured: event.target.checked })}
+              />
+              <span>
+                <strong>Feature this dish</strong>
+                <small>Prioritize it in menu highlights when available and photographed.</small>
               </span>
             </label>
             <div className="menu-editor-dietary-fields">
@@ -407,7 +548,7 @@ function DishEditor({
               </label>
             </div>
             <div className="menu-editor-image-actions">
-              <button
+              {!creating && <button
                 type="button"
                 disabled={uploading}
                 onClick={() =>
@@ -418,8 +559,8 @@ function DishEditor({
                 }
               >
                 Try a sample photo
-              </button>
-              <button
+              </button>}
+              {!creating && <button
                 type="button"
                 disabled={uploading}
                 onClick={() =>
@@ -430,7 +571,7 @@ function DishEditor({
                 }
               >
                 Try a sample cutout
-              </button>
+              </button>}
               {draft.image && (
                 <button
                   type="button"
@@ -468,8 +609,8 @@ function DishEditor({
                   </p>
                 </div>
               )}
-              {!draft.available && (
-                <span className="menu-editor-sold-out">Sold out</span>
+              {(draft.archived || !draft.available) && (
+                <span className="menu-editor-sold-out">{draft.archived ? "Archived" : "Sold out"}</span>
               )}
             </div>
             <div className="menu-editor-preview-copy">
@@ -499,7 +640,7 @@ function DishEditor({
               <strong>{priceLabel}</strong>
             </div>
           </aside>
-        </div>
+        </fieldset>
         {error && (
           <p className="menu-editor-error" role="alert">
             {error}
@@ -512,8 +653,8 @@ function DishEditor({
         )}
         <div className="menu-editor-save-bar">
           <p>
-            {dirty
-              ? "Publish to update the lunch menu and delivery quotes."
+            {creating || dirty
+              ? "Publish to update the lunch menu and pickup quotes."
               : "The customer menu uses these details."}
           </p>
           <div>
@@ -521,28 +662,75 @@ function DishEditor({
               type="button"
               className="menu-editor-secondary"
               onClick={onReload}
-              disabled={uploading || saving || !dirty}
+              disabled={uploading || saving || (!creating && !dirty)}
             >
-              Discard changes
+              {creating ? "Discard new dish" : "Discard changes"}
             </button>
             <button
               type="submit"
               className="menu-editor-primary"
               disabled={uploading || saving || !dirty || changedElsewhere}
             >
-              {uploading ? "Reading image…" : saving ? "Publishing…" : "Publish changes"}
+              {uploading ? "Reading image…" : saving ? "Publishing…" : creating ? "Publish dish" : "Publish changes"}
               <span aria-hidden="true">↗</span>
             </button>
           </div>
         </div>
       </form>
+      {item && (
+        <section className="menu-editor-archive-tools" aria-label="Dish archive">
+          {confirmArchive ? (
+            <div className="menu-editor-archive-confirm" role="group" aria-labelledby="menu-editor-archive-title">
+              <div>
+                <h3 id="menu-editor-archive-title" ref={archiveHeading} tabIndex={-1}>Archive {item.name}?</h3>
+                <p>This moves the dish out of the customer menu. Previous orders keep their saved details.</p>
+              </div>
+              <div>
+                <button
+                  className="menu-editor-secondary"
+                  type="button"
+                  disabled={saving}
+                  onClick={() => {
+                    setConfirmArchive(false);
+                    requestAnimationFrame(() => archiveButton.current?.focus());
+                  }}
+                >
+                  Cancel
+                </button>
+                <button className="menu-editor-primary" type="button" disabled={saving || uploading || dirty || changedElsewhere} onClick={() => void updateArchive(true)}>
+                  {saving ? "Archiving…" : "Confirm archive"}
+                </button>
+              </div>
+            </div>
+          ) : (
+            <>
+              <p>{dirty
+                ? "Publish or discard your changes to update this dish’s archive status."
+                : draft.archived
+                  ? "Restore this dish with its saved availability and options."
+                  : "Move this dish to Archived so guests can’t order it."}</p>
+              <button
+                className="menu-editor-secondary"
+                type="button"
+                ref={archiveButton}
+                disabled={saving || uploading || dirty || changedElsewhere}
+                onClick={() => draft.archived ? void updateArchive(false) : setConfirmArchive(true)}
+              >
+                {draft.archived ? saving ? "Restoring…" : "Restore dish" : "Archive dish"}
+              </button>
+            </>
+          )}
+        </section>
+      )}
     </div>
   );
 }
 
 function MenuEditorWorkspace() {
   const catalog = useMenuCatalog().filter(isLunchMenuItem);
-  const [selectedId, setSelectedId] = useState(catalog[0]?.id ?? "");
+  const [selectedId, setSelectedId] = useState<string>(catalog[0]?.id ?? "");
+  const [creating, setCreating] = useState(false);
+  const [archiveView, setArchiveView] = useState(false);
   const [search, setSearch] = useState("");
   const [categoryFilter, setCategoryFilter] = useState("all");
   const [dirty, setDirty] = useState(false);
@@ -551,8 +739,11 @@ function MenuEditorWorkspace() {
   const [resetOpen, setResetOpen] = useState(false);
   const [resetting, setResetting] = useState(false);
   const resetHeading = useRef<HTMLHeadingElement>(null);
-  const selected = catalog.find((item) => item.id === selectedId) ?? catalog[0];
-  const matches = catalog.filter(
+  const addButton = useRef<HTMLButtonElement>(null);
+  const noticeRegion = useRef<HTMLParagraphElement>(null);
+  const visibleCatalog = catalog.filter(item => (item.archived === true) === archiveView);
+  const selected = visibleCatalog.find((item) => item.id === selectedId) ?? visibleCatalog[0];
+  const matches = visibleCatalog.filter(
     (item) =>
       (categoryFilter === "all" || item.categoryId === categoryFilter) &&
       `${item.name} ${item.description}`
@@ -567,6 +758,60 @@ function MenuEditorWorkspace() {
     setRevision((value) => value + 1);
     setNotice("");
   }
+  function addDish() {
+    if (dirty) {
+      setNotice("Save or discard your changes before adding a dish.");
+      return;
+    }
+    setNotice("");
+    setCreating(true);
+  }
+  function closeEditor() {
+    if (creating) {
+      setCreating(false);
+      requestAnimationFrame(() => addButton.current?.focus());
+    }
+    reload();
+  }
+  function onSaved(item: MenuCatalogItem) {
+    if (creating) {
+      setCreating(false);
+      setArchiveView(false);
+      setSelectedId(item.id);
+      setSearch("");
+      setCategoryFilter("all");
+      setNotice(
+        item.available === false
+          ? `${item.name} was published as sold out.`
+          : `${item.name} is now on the lunch menu.`,
+      );
+    } else {
+      setNotice("");
+    }
+  }
+  function changeArchiveView(archived: boolean) {
+    if (archiveView === archived) return;
+    if (dirty) {
+      setNotice("Publish or discard your changes before changing the dish view.");
+      return;
+    }
+    setArchiveView(archived);
+    setSearch("");
+    setCategoryFilter("all");
+    setNotice("");
+  }
+  function onArchiveChange(item: MenuCatalogItem) {
+    setArchiveView(item.archived === true);
+    setSelectedId(item.id);
+    setSearch("");
+    setCategoryFilter("all");
+    setNotice(item.archived
+      ? `${item.name} moved to Archived.`
+      : item.available === false
+        ? `${item.name} restored as sold out.`
+        : `${item.name} restored to the lunch menu.`);
+    requestAnimationFrame(() => noticeRegion.current?.focus());
+  }
   async function reset() {
     if (resetting) return;
     setResetting(true);
@@ -574,7 +819,7 @@ function MenuEditorWorkspace() {
       await resetPublishedMenu();
       reload();
       setResetOpen(false);
-      setNotice("The original lunch menu was restored.");
+      setNotice("Menu defaults restored.");
     } catch (err) {
       setNotice(
         err instanceof Error
@@ -594,13 +839,29 @@ function MenuEditorWorkspace() {
               Publish dish details, prices and menu photography to the lunch menu.
             </span>
           </div>
-          <div className="menu-editor-scope">
-            <strong>Local preview</strong>
-            <p>Updates apply to the menu and unpaid delivery quotes.</p>
+          <div className="menu-editor-heading-actions">
+            <button
+              type="button"
+              className="menu-editor-primary"
+              ref={addButton}
+              disabled={creating || resetOpen}
+              onClick={addDish}
+            >
+              Add dish <span aria-hidden="true">+</span>
+            </button>
+            <div className="menu-editor-scope">
+              <strong>Local preview</strong>
+              <p>Updates apply to the menu and pickup quotes.</p>
+            </div>
           </div>
         </div>
-        <div className="menu-editor-layout">
-          <aside className="menu-editor-sidebar" aria-label="Choose a dish">
+        {notice && <p className="menu-editor-global-notice" role="status" tabIndex={-1} ref={noticeRegion}>{notice}</p>}
+        <div className={`menu-editor-layout${creating ? " menu-editor-layout--create" : ""}`}>
+          {!creating && <aside className="menu-editor-sidebar" aria-label="Choose a dish">
+            <div className="menu-editor-archive-tabs" role="group" aria-label="Dish visibility">
+              <button type="button" aria-pressed={!archiveView} onClick={() => changeArchiveView(false)}>Current</button>
+              <button type="button" aria-pressed={archiveView} onClick={() => changeArchiveView(true)}>Archived</button>
+            </div>
             <label className="menu-editor-search">
               <span>Find a dish</span>
               <input
@@ -650,7 +911,7 @@ function MenuEditorWorkspace() {
                     <strong>{item.name}</strong>
                     <span>
                       {formatMoney(item.priceCents)} CAD <i>·</i>{" "}
-                      {item.available === false ? "Sold out" : "Available"}
+                      {item.archived ? "Archived" : item.available === false ? "Sold out" : "Available"}
                     </span>
                   </div>
                   <span aria-hidden="true">↗</span>
@@ -658,7 +919,9 @@ function MenuEditorWorkspace() {
               ))}
               {matches.length === 0 && (
                 <p className="menu-editor-no-results">
-                  No matching dishes. Try a different search.
+                  {archiveView && visibleCatalog.length === 0
+                    ? "No archived dishes."
+                    : "No matching dishes. Try a different search."}
                 </p>
               )}
             </div>
@@ -669,22 +932,18 @@ function MenuEditorWorkspace() {
             >
               Restore original menu
             </button>
-          </aside>
-          {selected && (
+          </aside>}
+          {(creating || selected) && (
             <DishEditor
-              key={`${selected.id}-${revision}`}
-              item={selected}
+              key={creating ? "new-dish" : `${selected?.id}-${revision}`}
+              item={creating ? null : selected ?? null}
               onDirty={setDirty}
-              onSaved={() => setNotice("")}
-              onReload={reload}
+              onSaved={onSaved}
+              onArchiveChange={onArchiveChange}
+              onReload={closeEditor}
             />
           )}
         </div>
-        {notice && (
-          <p className="menu-editor-global-notice" role="status">
-            {notice}
-          </p>
-        )}
         {resetOpen && (
           <section
             className="menu-editor-reset-confirm"
@@ -692,10 +951,10 @@ function MenuEditorWorkspace() {
           >
             <div>
               <h2 ref={resetHeading} tabIndex={-1}>
-                Restore the original menu data?
+                Restore menu defaults?
               </h2>
               <p>
-                This restores all lunch dishes, prices and photos to their original values.
+                Reset current dishes to their source or creation defaults. Archived dishes keep their saved settings.
               </p>
             </div>
             <div>

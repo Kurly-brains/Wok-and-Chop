@@ -13,6 +13,8 @@
   padding-inline: clamp(20px, 5vw, 76px);
 }
 
+.footer-feast--copy-only .footer-feast-inner { grid-template-columns: minmax(0, 1fr); }
+
 .footer-feast-art {
   position: relative;
   min-width: 0;

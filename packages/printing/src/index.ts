@@ -73,23 +73,26 @@ export type DeliverySlipAudience = 'kitchen' | 'driver';
 
 export interface DeliverySlipOrder {
   number: string;
-  status: 'RECEIVED' | 'PREPARING' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'CANCELLED';
+  status: 'RECEIVED' | 'PREPARING' | 'READY_FOR_PICKUP' | 'PICKED_UP' | 'OUT_FOR_DELIVERY' | 'DELIVERED' | 'CANCELLED';
+  fulfillment?: 'DELIVERY' | 'PICKUP';
   updatedAt: string;
   name: string;
   phone: string;
-  address: { street: string; unit?: string | null; city: string; province: string; postalCode: string };
+  address: { street: string; unit?: string | null; city: string; province: string; postalCode: string } | null;
   instructions?: string | null;
   items: { name: string; quantity: number; modifiers: readonly string[]; note?: string | null }[];
 }
 
 /** Text intended for manager-authorized local review and download. No printer commands. */
 export function renderDeliverySlip(order: DeliverySlipOrder, audience: DeliverySlipAudience, columns = 42): string {
-  const state = { RECEIVED: 'Received', PREPARING: 'Preparing', OUT_FOR_DELIVERY: 'Out for delivery', DELIVERED: 'Delivered', CANCELLED: 'Cancelled' }[order.status];
+  const pickup = order.fulfillment === 'PICKUP';
+  const state = { RECEIVED: 'Received', PREPARING: 'Preparing', READY_FOR_PICKUP: 'Ready for pickup', PICKED_UP: 'Picked up', OUT_FOR_DELIVERY: 'Out for delivery', DELIVERED: 'Delivered', CANCELLED: 'Cancelled' }[order.status];
   const revised = new Intl.DateTimeFormat('en-CA', { timeZone: 'America/Toronto', dateStyle: 'medium', timeStyle: 'short' }).format(new Date(order.updatedAt));
-  const lines = ['WOK & CHOP', audience === 'kitchen' ? 'DELIVERY / KITCHEN COPY' : 'DELIVERY / DRIVER COPY',
+  const lines = ['WOK & CHOP', (pickup ? 'PICKUP' : 'DELIVERY') + (audience === 'kitchen' ? ' / KITCHEN COPY' : ' / DRIVER COPY'),
     '#' + sanitizeTicketText(order.number, 30), state, ...wrapTicketText('Updated ' + revised + ' (Toronto)', columns), '-'.repeat(columns)];
   if (order.status === 'CANCELLED') lines.push('CANCELLED / DO NOT FULFIL', '');
   if (order.status === 'DELIVERED') lines.push('ALREADY DELIVERED', '');
+  if (order.status === 'PICKED_UP') lines.push('ALREADY PICKED UP', '');
   if (audience === 'kitchen') {
     for (const item of order.items) {
       lines.push(...wrapTicketText(item.quantity + ' × ' + item.name, columns));
@@ -98,6 +101,7 @@ export function renderDeliverySlip(order: DeliverySlipOrder, audience: DeliveryS
       lines.push('');
     }
   } else {
+    if (pickup || !order.address) throw new Error('A delivery address is required for a driver slip.');
     const { street, unit, city, province, postalCode } = order.address;
     lines.push('RECIPIENT', ...wrapTicketText(order.name, columns), ...wrapTicketText(order.phone, columns), '',
       'DROP-OFF', ...wrapTicketText(street, columns));
